@@ -1,0 +1,70 @@
+<property name="createLawInfoIndex" desc="创建新闻索引">
+    <![CDATA[
+        {
+            "settings": {
+                "number_of_shards": 6,
+                "index.refresh_interval": "5s"
+            },
+            "mappings": {
+                "properties": {
+                    "id": {
+                        "type": "long"
+                    },
+                    "outerId": {
+                        "type": "keyword"
+                    },
+                    "type": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "text",
+                        "analyzer": "ik_max_word"
+                    },
+                    "subject": {
+                        "type": "text",
+                        "analyzer": "ik_max_word"
+                    },
+                    "effective": {
+                        "type": "date",
+                        "format": "yyyy-MM-dd HH:mm:ss.SSS||yyyy-MM-dd'T'HH:mm:ss.SSS||yyyy-MM-dd HH:mm:ss||epoch_millis",
+                        "null_value": true
+                    },
+                    "publish": {
+                        "type": "date",
+                        "format": "yyyy-MM-dd HH:mm:ss.SSS||yyyy-MM-dd'T'HH:mm:ss.SSS||yyyy-MM-dd HH:mm:ss||epoch_millis",
+                        "null_value": true
+                    },
+                    "part": {
+                        "type": "integer",
+                        "null_value": -1
+                    },
+                    "chapter": {
+                        "type": "integer",
+                        "null_value": -1
+                    },
+                    "section": {
+                        "type": "integer",
+                        "null_value": -1
+                    },
+                    "article": {
+                        "type": "integer",
+                        "null_value": -1
+                    },
+                    "content": {
+                        "type": "text",
+                        "analyzer": "ik_max_word"
+                    },
+                    "docFileUrl": {
+                        "type": "keyword"
+                    },
+                    "pdfFileUrl": {
+                        "type": "keyword"
+                    }
+                }
+            }
+        }
+    ]]>
+</property>

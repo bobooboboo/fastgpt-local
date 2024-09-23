@@ -17,7 +17,7 @@ fastgpt:
 
 
 server:
-  port: 8080
+  port: 8083
 spring:
   application:
     name: SpringbootFastGPTApplication
@@ -29,12 +29,41 @@ spring:
       max-file-size: 2GB
       max-request-size: 2GB
   datasource:
-    url: jdbc:mysql://10.200.3.254:3306/collector?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&useSSL=false&serverTimezone=GMT%2B8
+    url: jdbc:mysql://192.168.1.13:3306/law?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&useSSL=false&serverTimezone=GMT%2B8
     username: root
-    password: hz123456
+    password: oneapimmysql
     driver-class-name: com.mysql.cj.jdbc.Driver
   redis:
     host: 192.168.1.133
     port: 6379
     database: 15
     password: Hztech@1.133
+  elasticsearch:
+    bboss:
+      elasticUser:
+      elasticPassword:
+      elasticsearch:
+        rest:
+          hostNames: 192.168.1.13:9200
+        dateFormat: yyyy.MM.dd
+        timeZone: Asia/Shanghai
+        showTemplate: true
+        discoverHost: false
+      dslfile:
+        refreshInterval: -1
+      http:
+        timeoutConnection: 5000
+        timeoutSocket: 5000
+        connectionRequestTimeout: 5000
+        retryTime: 1
+        maxLineLength: -1
+        maxHeaderCount: 200
+        maxTotal: 400
+        defaultMaxPerRoute: 200
+        soReuseAddress: false
+        soKeepAlive: false
+        timeToLive: 3600000
+        keepAlive: 3600000
+        keystore:
+        keyPassword:
+        hostnameVerifier:

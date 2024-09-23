@@ -39,10 +39,10 @@ public class FastGPTService {
     private final ServiceRequests serviceRequests;
 
     public Boolean pushData(PushDataRequestDTO requestDTO) {
-        if (requestDTO == null || HzCollectionUtils.isEmpty(requestDTO.getData())) {
+        if (requestDTO == null || requestDTO.getType() == null || HzCollectionUtils.isEmpty(requestDTO.getData())) {
             return true;
         }
-
+        log.info("推送{}数据{}条：{}", requestDTO.getType().getDesc(), requestDTO.getData().size(), JSONUtil.toJsonStr(requestDTO));
         int startPageNum = 1, startPageSize = 30;
         boolean hasMore = true;
         String datasetId = getDatasetId(requestDTO.getType());
@@ -76,7 +76,7 @@ public class FastGPTService {
 
         List<String> deletedCollections = new HzCompareListUtils<>(requestDTO.getData().stream().map(PushDataRequestDTO.Data::getId).collect(Collectors.toList()), new ArrayList<>(map.keySet()), HzStringUtils::equals).getDelete();
         if (HzCollectionUtils.isNotEmpty(deletedCollections)) {
-            log.info("准备删除{}个集合", deletedCollections.size());
+            log.info("准备删除{}个集合:{}", deletedCollections.size(), JSONUtil.toJsonStr(deletedCollections));
             deletedCollections.forEach(id -> serviceRequests.deleteCollection(map.get(id).get_id()));
         }
         return true;

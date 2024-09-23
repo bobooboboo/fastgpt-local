@@ -18,4 +18,6 @@ public class ListCollectionResponseDTO {
     private String name;
 
     private LocalDateTime updateTime;
+
+    private String trainingType;
 }

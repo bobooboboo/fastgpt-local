@@ -10,4 +10,5 @@ import com.hztech.service.transactionscript.IHzTransactionScriptService;
  */
 public interface IArticleService extends IHzTransactionScriptService<ArticleDO, Long> {
 
+    Boolean save(Integer from, Integer size);
 }
