@@ -1,29 +1,45 @@
 package com.hztech.fastgpt.service;
 
+import cn.hutool.cache.Cache;
+import cn.hutool.cache.CacheUtil;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.hztech.exception.HzRuntimeException;
 import com.hztech.fastgpt.ServiceRequests;
+import com.hztech.fastgpt.entity.ChatMessage;
 import com.hztech.fastgpt.model.dto.request.ChatCompletionsRequestDTO;
 import com.hztech.fastgpt.model.dto.request.PushDataRequestDTO;
+import com.hztech.fastgpt.model.dto.request.SaveSceneDataRequestDTO;
 import com.hztech.fastgpt.model.dto.response.ListAppResponseDTO;
 import com.hztech.fastgpt.model.dto.response.ListCollectionResponseDTO;
 import com.hztech.fastgpt.model.dto.response.ListDatasetResponseDTO;
 import com.hztech.fastgpt.model.enums.EnumBusinessType;
+import com.hztech.fastgpt.properties.FastGPTProperties;
 import com.hztech.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import static com.hztech.fastgpt.constant.ApiConstants.PATH_CHAT_COMPLETIONS;
 
 /**
  * FastGPTService
@@ -36,7 +52,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FastGPTService {
 
+    private final FastGPTProperties properties;
+
     private final ServiceRequests serviceRequests;
+
+    private static final Cache<String, SaveSceneDataRequestDTO> CACHE = CacheUtil.newLFUCache(3000);
 
     public Boolean pushData(PushDataRequestDTO requestDTO) {
         if (requestDTO == null || requestDTO.getType() == null || HzCollectionUtils.isEmpty(requestDTO.getData())) {
@@ -103,7 +123,102 @@ public class FastGPTService {
     @SneakyThrows
     public SseEmitter chatCompletionsStream(ChatCompletionsRequestDTO requestDTO) {
         MDC.put("chatKey", requestDTO.getChatKey());
-        return serviceRequests.chatCompletionsStream(requestDTO.getChatId(), requestDTO.getVariables(), requestDTO.getMessages());
+        return chatCompletionsStream(requestDTO.getChatId(), requestDTO.getVariables(), requestDTO.getMessages());
+//        return serviceRequests.chatCompletionsStream(requestDTO.getChatId(), requestDTO.getVariables(), requestDTO.getMessages());
+    }
+
+    /**
+     * 流式对话
+     *
+     * @param chatId       为 undefined 时（不传入），不使用 FastGpt 提供的上下文功能，完全通过传入的 messages 构建上下文。 不会将你的记录存储到数据库中，你也无法在记录汇总中查阅到。
+     *                     为非空字符串时，意味着使用 chatId 进行对话，自动从 FastGpt 数据库取历史记录，并使用 messages 数组最后一个内容作为用户问题。请自行确保 chatId 唯一，长度小于250，通常可以是自己系统的对话框ID。
+     * @param variables    模块变量，一个对象，会替换模块中，输入框内容里的{{key}}
+     * @param messages     结构与 GPT接口 chat模式一致。
+     */
+    public SseEmitter chatCompletionsStream(String chatId, Map<String, String> variables,
+                                            List<ChatMessage> messages) {
+        if (log.isDebugEnabled()) {
+            log.debug("request chatCompletionsStream chatId={}, stream={}, variables={}, messages={}",
+                    chatId, true, variables, messages);
+        }
+        JSONObject param = new JSONObject();
+        param.set("chatId", chatId);
+        param.set("stream", true);
+        param.set("detail", false);
+        param.set("variables", variables);
+        param.set("messages", messages);
+
+        try {
+            return this.postSSERequest(PATH_CHAT_COMPLETIONS, param);
+        } catch (Exception e) {
+            log.info(e.getLocalizedMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    private SseEmitter postSSERequest(String path, JSONObject param) {
+        try {
+            SseEmitter emitter = new SseEmitter();
+            String chatKey = MDC.get("chatKey");
+            String chatId = param.getStr("chatId");
+            Mono.fromCallable(() -> {
+                        log.info("sse start:{}", DateUtil.now());
+                        WebClient.create(combPath(path))
+                                .post()
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.TEXT_EVENT_STREAM)
+                                .body(BodyInserters.fromValue(param.toString()))
+                                .header(HttpHeaders.AUTHORIZATION, "Bearer " + StrUtil.blankToDefault(chatKey, this.properties.getChatKey()))
+                                .retrieve()
+                                .bodyToFlux(String.class)
+                                .doOnNext(data -> {
+                                    try {
+                                        if (HzStringUtils.isNotBlank(data)) {
+                                            if (HzStringUtils.isNotBlank(chatId) && CACHE.containsKey(chatId) && !HzStringUtils.equals("[DONE]", data) && JSONUtil.isTypeJSON(data)) {
+                                                SaveSceneDataRequestDTO requestDTO = CACHE.get(chatId);
+                                                JSONObject jsonObject = JSONUtil.parseObj(data);
+                                                if (ObjectUtil.isNotEmpty(requestDTO.getData())) {
+                                                    jsonObject.set("data", requestDTO.getData());
+                                                }
+                                                if (HzStringUtils.isNotBlank(requestDTO.getCode())) {
+                                                    jsonObject.set("code", requestDTO.getCode());
+                                                }
+                                                data = jsonObject.toString();
+                                            }
+                                            emitter.send(data);
+                                        }
+                                    } catch (IOException e) {
+                                        log.error("Event Stream Exception:", e);
+                                    }
+                                })
+                                .doOnError(error -> {
+                                    log.error("Event Stream Error:", error);
+                                    if (HzStringUtils.isNotBlank(chatId)) {
+                                        CACHE.remove(chatId);
+                                    }
+                                })
+                                .doOnComplete(() -> {
+                                    log.info("sse finish:{}", DateUtil.now());
+                                    emitter.complete();
+                                    if (HzStringUtils.isNotBlank(chatId)) {
+                                        CACHE.remove(chatId);
+                                    }
+                                })
+                                .subscribe();
+
+                        return emitter;
+                    })
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe();
+            return emitter;
+        } catch (Exception e) {
+            log.info("path=[{}], params=[{}] error.", path, param, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String combPath(String path) {
+        return this.properties.getApiUrl() + path;
     }
 
     @SneakyThrows
@@ -122,5 +237,10 @@ public class FastGPTService {
 
     public List<ListAppResponseDTO> listApp(String parentId, String searchKey) {
         return JSONUtil.parseObj(serviceRequests.listApp(parentId, searchKey)).getBeanList("data", ListAppResponseDTO.class);
+    }
+
+
+    public void saveSceneData(SaveSceneDataRequestDTO requestDTO) {
+        CACHE.put(requestDTO.getChatId(), requestDTO);
     }
 }

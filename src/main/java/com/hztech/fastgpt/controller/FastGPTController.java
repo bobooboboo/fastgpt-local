@@ -2,6 +2,7 @@ package com.hztech.fastgpt.controller;
 
 import com.hztech.fastgpt.model.dto.request.ChatCompletionsRequestDTO;
 import com.hztech.fastgpt.model.dto.request.PushDataRequestDTO;
+import com.hztech.fastgpt.model.dto.request.SaveSceneDataRequestDTO;
 import com.hztech.fastgpt.model.dto.response.ListAppResponseDTO;
 import com.hztech.fastgpt.model.dto.response.ListDatasetResponseDTO;
 import com.hztech.fastgpt.service.FastGPTService;
@@ -91,4 +92,14 @@ public class FastGPTController {
     public SseEmitter chatCompletionsStream(@RequestBody ChatCompletionsRequestDTO requestDTO) {
         return fastGPTService.chatCompletionsStream(requestDTO);
     }
+
+    /**
+     * 保存聊天场景code以及响应数据
+     */
+    @PostMapping("/api/v1/chat/saveSceneData")
+    public HzResponse<Void> saveSceneData(@RequestBody SaveSceneDataRequestDTO requestDTO) {
+        fastGPTService.saveSceneData(requestDTO);
+        return HzResponse.success();
+    }
+
 }

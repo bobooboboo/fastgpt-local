@@ -1,6 +1,11 @@
 package com.hztech.fastgpt.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.convert.Convert;
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.BooleanUtil;
+import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONConfig;
 import cn.hutool.json.JSONObject;
@@ -31,6 +36,7 @@ import org.frameworkset.elasticsearch.client.ClientInterface;
 import org.frameworkset.elasticsearch.entity.ESDatas;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -109,13 +115,23 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
             List<LawContentResponseDTO> list = lawContentMapperWrapper.findListByQuery(lawContentQuery, LawContentResponseDTO.class);
             map.putAll(list.stream().collect(Collectors.groupingBy(LawContentResponseDTO::getOuterId, Collectors.mapping(LawContentResponseDTO::getContent, Collectors.joining("\n")))));
         }
+        Map<String, String> fullContentMap = new HashMap<>();
+        if (BooleanUtil.isTrue(requestDTO.getFullContent())) {
+            List<String> outerIds = page.getRows().stream().map(LawInfoSearchResponseDTO::getOuterId).collect(Collectors.toList());
+            LawContentQuery lawContentQuery = lawContentMapperWrapper.query().select.outerId().content().end().where.outerId().in(outerIds).end();
+            List<LawContentResponseDTO> list = lawContentMapperWrapper.findListByQuery(lawContentQuery, LawContentResponseDTO.class);
+            fullContentMap.putAll(list.stream().collect(Collectors.groupingBy(LawContentResponseDTO::getOuterId, Collectors.mapping(LawContentResponseDTO::getContent, Collectors.joining("\n")))));
+        }
         result.setRows(page.getRows().stream().map(responseDTO -> {
             LawInfoSearchV2ResponseDTO dto = new LawInfoSearchV2ResponseDTO();
             dto.setTitle(responseDTO.getTitle());
-            if (requestDTO.getChapter() != null) {
+            if (requestDTO.getChapter() != null && requestDTO.getArticle() == null) {
                 dto.setContent(map.get(responseDTO.getOuterId()));
             } else if (requestDTO.getArticle() != null) {
                 dto.setContent(responseDTO.getContent());
+            }
+            if (BooleanUtil.isTrue(requestDTO.getFullContent())) {
+                dto.setContent(fullContentMap.get(responseDTO.getOuterId()));
             }
             dto.setFileUrl("http://192.168.1.13:8080" + StrUtil.blankToDefault(responseDTO.getPdfFileUrl(), responseDTO.getDocFileUrl()));
             return dto;
@@ -126,6 +142,11 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
     private LawInfoElasticSearchRequestDTO buildElasticSearchRequestDTO(LawInfoSearchRequestDTO requestDTO) {
         LawInfoElasticSearchRequestDTO lawInfoElasticSearchRequestDTO =
                 new LawInfoElasticSearchRequestDTO((requestDTO.getCurrent() - 1) * requestDTO.getSize(), requestDTO.getSize());
+        if (requestDTO.getYear() != null && requestDTO.getYear() > 0) {
+            DateTime beginOfYear = DateUtil.parseDateTime(requestDTO.getYear() + "-01-01 00:00:00");
+            requestDTO.setPublishBegin(beginOfYear.toString());
+            requestDTO.setPublishEnd(DateUtil.endOfYear(beginOfYear).toString());
+        }
         if (HzCollectionUtils.isNotEmpty(requestDTO.getType())) {
             LawInfoElasticSearchRequestDTO.Must terms = new LawInfoElasticSearchRequestDTO.Must("terms");
             terms.set("type", requestDTO.getType().stream().map(EnumLawType::getValue).collect(Collectors.toList()));
@@ -136,31 +157,38 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
             terms.set("status", requestDTO.getStatus().stream().map(EnumLawStatus::getValue).collect(Collectors.toList()));
             lawInfoElasticSearchRequestDTO.must(terms);
         }
-        if (requestDTO.getPart() != null) {
+        if (requestDTO.getPart() != null && requestDTO.getPart() > 0) {
             LawInfoElasticSearchRequestDTO.Must term = new LawInfoElasticSearchRequestDTO.Must("term");
             term.set("part", requestDTO.getPart());
             lawInfoElasticSearchRequestDTO.must(term);
         }
-        if (requestDTO.getChapter() != null) {
+        if (requestDTO.getChapter() != null && requestDTO.getChapter() > 0) {
             LawInfoElasticSearchRequestDTO.Must term = new LawInfoElasticSearchRequestDTO.Must("term");
             term.set("chapter", requestDTO.getChapter());
             lawInfoElasticSearchRequestDTO.must(term);
         }
-        if (requestDTO.getSection() != null) {
+        if (requestDTO.getSection() != null && requestDTO.getSection() > 0) {
             LawInfoElasticSearchRequestDTO.Must term = new LawInfoElasticSearchRequestDTO.Must("term");
             term.set("section", requestDTO.getSection());
             lawInfoElasticSearchRequestDTO.must(term);
         }
-        if (requestDTO.getArticle() != null) {
+        if (requestDTO.getArticle() != null && requestDTO.getArticle() > 0) {
             LawInfoElasticSearchRequestDTO.Must term = new LawInfoElasticSearchRequestDTO.Must("term");
             term.set("article", requestDTO.getArticle());
             lawInfoElasticSearchRequestDTO.must(term);
         }
-        if (HzStringUtils.isNotBlank(requestDTO.getPublishBegin()) || HzStringUtils.isNotBlank(requestDTO.getPublishEnd())) {
+        if ((HzStringUtils.isNotBlank(requestDTO.getPublishBegin()) && !HzStringUtils.equals("null", requestDTO.getPublishBegin()))
+                || (HzStringUtils.isNotBlank(requestDTO.getPublishEnd()) && !HzStringUtils.equals("null", requestDTO.getPublishEnd()))) {
             LawInfoElasticSearchRequestDTO.Must range = new LawInfoElasticSearchRequestDTO.Must("range");
             JSONObject rangeValue = new JSONObject(JSONConfig.create().setIgnoreNullValue(true));
-            rangeValue.set("gte", requestDTO.getPublishBegin());
-            rangeValue.set("lte", requestDTO.getPublishEnd());
+            if (HzStringUtils.isNotBlank(requestDTO.getPublishBegin())) {
+                DateTime publishBegin = DateUtil.parse(requestDTO.getPublishBegin());
+                rangeValue.set("gte", DateUtil.beginOfDay(publishBegin).toString());
+            }
+            if (HzStringUtils.isNotBlank(requestDTO.getPublishEnd())) {
+                DateTime publishEnd = DateUtil.parse(requestDTO.getPublishEnd());
+                rangeValue.set("lte", DateUtil.endOfDay(publishEnd).toString());
+            }
             range.set("publish", rangeValue);
             lawInfoElasticSearchRequestDTO.must(range);
         }
@@ -222,6 +250,32 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
                     lawInfoElasticSearchRequestDTO.must(match);
                 }
             }
+        }
+        Object textList = requestDTO.getTextList();
+        if (ObjectUtil.isNotEmpty(textList)) {
+            // 领域搜索
+            List<String> list = new ArrayList<>();
+            if (textList instanceof String) {
+                list = JSONUtil.parseArray(textList).toList(String.class);
+            } else if (textList instanceof List) {
+                list = Convert.toList(String.class, textList);
+            }
+            for (String text : list) {
+                if (requestDTO.getSearchMode() == null || requestDTO.getSearchMode() == EnumLawSearchMode.INTELLIGENT) {
+                    LawInfoElasticSearchRequestDTO.Should titleShould = new LawInfoElasticSearchRequestDTO.Should("match");
+                    JSONObject jsonObject = new JSONObject();
+                    jsonObject.set("query", text);
+                    titleShould.set("title", jsonObject);
+                    lawInfoElasticSearchRequestDTO.should(titleShould);
+                } else if (requestDTO.getSearchMode() == EnumLawSearchMode.ACCURATE) {
+                    LawInfoElasticSearchRequestDTO.Should titleShould = new LawInfoElasticSearchRequestDTO.Should("match_phrase");
+                    JSONObject jsonObject = new JSONObject();
+                    jsonObject.set("query", text);
+                    titleShould.set("title", jsonObject);
+                    lawInfoElasticSearchRequestDTO.should(titleShould);
+                }
+            }
+            requestDTO.setSize(list.size() * 2L);
         }
         // 排序
         if (requestDTO.getSortType() == EnumLawSortType.PUBLISH_ASC) {

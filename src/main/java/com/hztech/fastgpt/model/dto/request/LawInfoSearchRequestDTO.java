@@ -21,6 +21,11 @@ public class LawInfoSearchRequestDTO {
     @ApiModelProperty(value = "检索内容")
     private String text;
 
+    /**
+     * 检索内容列表
+     */
+    private Object textList;
+
     @ApiModelProperty("搜索类型 0：全文；1：标题；2：内容")
     private EnumLawSearchType searchType;
 
@@ -76,6 +81,14 @@ public class LawInfoSearchRequestDTO {
      * 第几条
      */
     private Integer article;
+    /**
+     * 是否查询全文
+     */
+    private Boolean fullContent;
+    /**
+     * 发布年度
+     */
+    private Integer year;
 
     public String getPublishBegin() {
         return StrUtil.emptyToNull(publishBegin);
