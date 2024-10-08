@@ -2,6 +2,7 @@ package com.hztech.fastgpt.util;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.lang.mutable.MutableObj;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.ContentType;
@@ -17,6 +18,7 @@ import com.hztech.fastgpt.model.dto.response.CountryLawDetailDataResponseDTO;
 import com.hztech.fastgpt.model.dto.response.LawDetailResponseDTO;
 import com.hztech.fastgpt.model.dto.response.LawResponseDTO;
 import com.hztech.fastgpt.model.enums.EnumLawContentType;
+import com.hztech.fastgpt.model.enums.EnumLawSource;
 import com.hztech.fastgpt.model.enums.EnumLawStatus;
 import com.hztech.fastgpt.model.enums.EnumLawType;
 import com.hztech.fastgpt.service.ILawContentService;
@@ -196,6 +198,7 @@ public class LawDataUtils {
                 lawStatisticsDO.setSubject(basicData.getOffice());
                 lawStatisticsDO.setEffective(basicData.getExpiry());
                 lawStatisticsDO.setPublish(basicData.getPublish());
+                lawStatisticsDO.setDataSource(EnumLawSource.NATIONAL_LAWS_AND_REGULATIONS_DATABASE);
                 lawStatisticsDO.setDocFileUrl(docFileUrl);
                 lawStatisticsDO.setPdfFileUrl(pdfFileUrl);
                 lawStatisticsDO.setStatus(LAW_STATUS_MAP.get(basicData.getStatus()));
@@ -219,6 +222,7 @@ public class LawDataUtils {
                         lawElasticSearchDO.setEffective(basicData.getExpiry());
                         lawElasticSearchDO.setPublish(basicData.getPublish());
                         lawElasticSearchDO.setContent(lawDetailResponseDTO.getContent());
+                        lawElasticSearchDO.setDataSource(EnumLawSource.NATIONAL_LAWS_AND_REGULATIONS_DATABASE);
                         return lawElasticSearchDO;
                     }).collect(Collectors.toList());
                     HzSpringUtils.getBean(ILawContentService.class).insertBatch(list);
@@ -681,5 +685,45 @@ public class LawDataUtils {
             }
         }
         return response;
+    }
+
+    public static void temp() {
+        List<File> files = FileUtil.loopFiles("C:\\Users\\PC_Admin\\Desktop\\杭州工作制度");
+        for (File file : files) {
+            LawDO lawDO = new LawDO();
+            lawDO.setOuterId("random_" + RandomUtil.randomString(20));
+            lawDO.setTitle(file.getName().replace(".docx", ""));
+            lawDO.setType(EnumLawType.LOCAL_REGULATIONS);
+            lawDO.setStatus(EnumLawStatus.EFFECTIVE);
+            lawDO.setSubject("");
+            lawDO.setDataSource(EnumLawSource.MEASURES_FOR_THE_ESTABLISHMENT_OF_LOCAL_REGULATIONS_IN_HANGZHOU);
+//            lawDO.setDocFileUrl();
+//            lawDO.setPdfFileUrl();
+            HzSpringUtils.getBean(ILawService.class).save(lawDO);
+            Document document = new Document(file.getAbsolutePath(), FileFormat.Docx);
+            List<LawDetailResponseDTO> list;
+            if (file.getName().startsWith("杭州市人大常委会建立立法基层联系点办法")) {
+                list = readFromDocxWithoutPattern(document);
+            } else {
+                list = readFromDocxWithArticlePattern(document);
+            }
+            List<LawContentDO> lawContentList = list.stream().map(responseDTO -> {
+                LawContentDO contentDO = new LawContentDO();
+                contentDO.setOuterId(lawDO.getOuterId());
+                contentDO.setType(lawDO.getType());
+                contentDO.setStatus(lawDO.getStatus());
+                contentDO.setTitle(lawDO.getTitle());
+                contentDO.setSubject(lawDO.getSubject());
+                contentDO.setPart(responseDTO.getPart());
+                contentDO.setChapter(responseDTO.getChapter());
+                contentDO.setSection(responseDTO.getSection());
+                contentDO.setArticle(responseDTO.getArticle());
+                contentDO.setContentType(responseDTO.getContentType());
+                contentDO.setContent(responseDTO.getContent());
+                contentDO.setDataSource(lawDO.getDataSource());
+                return contentDO;
+            }).collect(Collectors.toList());
+            HzSpringUtils.getBean(ILawContentService.class).insertBatch(lawContentList);
+        }
     }
 }

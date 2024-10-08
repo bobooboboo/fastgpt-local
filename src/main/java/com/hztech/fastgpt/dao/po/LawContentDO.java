@@ -6,6 +6,7 @@ import cn.org.atool.fluent.mybatis.annotation.TableId;
 import cn.org.atool.fluent.mybatis.base.BaseEntity;
 import com.hztech.config.IHzFmBaseMapper;
 import com.hztech.fastgpt.model.enums.EnumLawContentType;
+import com.hztech.fastgpt.model.enums.EnumLawSource;
 import com.hztech.fastgpt.model.enums.EnumLawStatus;
 import com.hztech.fastgpt.model.enums.EnumLawType;
 import com.hztech.fluentmybatis.defaults.IBaseDefaultSetter;
@@ -138,6 +139,13 @@ public class LawContentDO extends BaseEntity implements Serializable,
     @TableField("content")
     @NotNull
     private String content;
+
+    /**
+     * 数据源
+     */
+    @TableField("data_source")
+    @NotNull
+    private EnumLawSource dataSource;
 
     /**
      * doc附件地址

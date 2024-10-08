@@ -8,6 +8,7 @@ import com.hztech.fastgpt.model.dto.response.LawInfoSearchResponseDTO;
 import com.hztech.fastgpt.model.dto.response.LawInfoSearchV2ResponseDTO;
 import com.hztech.fastgpt.model.dto.response.LawPageResponseDTO;
 import com.hztech.fastgpt.model.dto.response.TempLawPageResponseDTO;
+import com.hztech.fastgpt.service.IHigherLevelLawService;
 import com.hztech.fastgpt.service.ILawContentService;
 import com.hztech.fastgpt.service.ILawService;
 import com.hztech.fastgpt.util.LawDataUtils;
@@ -43,6 +44,8 @@ public class LawController {
     private final ILawContentService lawContentService;
 
     private final BBossESStarter bossESStarter;
+
+    private final IHigherLevelLawService higherLevelLawService;
 
     @Async
     @ApiIgnore
@@ -80,7 +83,6 @@ public class LawController {
         List<List<LawInfo>> lawList = ListUtil.split(list, 10000);
         ClientInterface restClient = bossESStarter.getRestClient();
         lawList.forEach(l -> restClient.addDocuments("law_info", l));
-//        String result = restClient.addDocuments("law_info", list);
         return HzResponse.success();
     }
 
@@ -96,4 +98,22 @@ public class LawController {
         HzPage<LawInfoSearchV2ResponseDTO> page = lawService.searchV2(requestDTO);
         return HzResponse.success(page);
     }
+
+    @ApiOperation("查询法律法规上位法")
+    @GetMapping("/api/v1/getHigherLevelLaw")
+    public HzResponse<String> getHigherLevelLaw(@RequestParam("title") String title) {
+        return HzResponse.success(higherLevelLawService.getHigherLevelLaw(title));
+    }
+
+    //    @PostMapping("/api/v1/initHigherLevelLaw")
+//    public HzResponse<Void> initHigherLevelLaw() {
+//        higherLevelLawService.initHigherLevelLaw();
+//        return HzResponse.success();
+//    }
+//
+//    @GetMapping("/api/v1/temp")
+//    public HzResponse<Void> temp() {
+//        LawDataUtils.temp();
+//        return HzResponse.success();
+//    }
 }

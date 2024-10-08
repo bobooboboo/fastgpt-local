@@ -90,6 +90,11 @@ public class LawInfoSearchRequestDTO {
      */
     private Integer year;
 
+    /**
+     * 数据源
+     */
+    private List<EnumLawSource> dataSource;
+
     public String getPublishBegin() {
         return StrUtil.emptyToNull(publishBegin);
     }

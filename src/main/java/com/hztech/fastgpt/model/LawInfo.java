@@ -3,6 +3,7 @@ package com.hztech.fastgpt.model;
 import com.frameworkset.orm.annotation.ESId;
 import com.frameworkset.orm.annotation.ESIndex;
 import com.frameworkset.orm.annotation.ESMetaHighlight;
+import com.hztech.fastgpt.model.enums.EnumLawSource;
 import com.hztech.fastgpt.model.enums.EnumLawStatus;
 import com.hztech.fastgpt.model.enums.EnumLawType;
 import lombok.Data;
@@ -96,6 +97,8 @@ public class LawInfo implements Serializable {
      * 第几条
      */
     private Integer article;
+
+    private EnumLawSource dataSource;
 
     /**
      * 文档对应的高亮检索信息

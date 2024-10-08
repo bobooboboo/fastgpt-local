@@ -2,7 +2,7 @@ package com.hztech.fastgpt.service;
 
 import cn.hutool.cache.Cache;
 import cn.hutool.cache.CacheUtil;
-import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
@@ -149,20 +149,25 @@ public class FastGPTService {
         param.set("messages", messages);
 
         try {
-            return this.postSSERequest(PATH_CHAT_COMPLETIONS, param);
+            return this.postSseRequest(PATH_CHAT_COMPLETIONS, param);
         } catch (Exception e) {
             log.info(e.getLocalizedMessage());
             throw new RuntimeException(e);
         }
     }
 
-    private SseEmitter postSSERequest(String path, JSONObject param) {
+    /**
+     * 发送sse请求
+     *
+     * @param path 请求路径
+     * @param param 请求参数
+     */
+    private SseEmitter postSseRequest(String path, JSONObject param) {
         try {
             SseEmitter emitter = new SseEmitter();
             String chatKey = MDC.get("chatKey");
             String chatId = param.getStr("chatId");
             Mono.fromCallable(() -> {
-                        log.info("sse start:{}", DateUtil.now());
                         WebClient.create(combPath(path))
                                 .post()
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -173,18 +178,31 @@ public class FastGPTService {
                                 .bodyToFlux(String.class)
                                 .doOnNext(data -> {
                                     try {
+                                        JSONObject jsonObject = null;
                                         if (HzStringUtils.isNotBlank(data)) {
                                             if (HzStringUtils.isNotBlank(chatId) && CACHE.containsKey(chatId) && !HzStringUtils.equals("[DONE]", data) && JSONUtil.isTypeJSON(data)) {
                                                 SaveSceneDataRequestDTO requestDTO = CACHE.get(chatId);
-                                                JSONObject jsonObject = JSONUtil.parseObj(data);
+                                                jsonObject = JSONUtil.parseObj(data);
                                                 if (ObjectUtil.isNotEmpty(requestDTO.getData())) {
-                                                    jsonObject.set("data", requestDTO.getData());
+                                                    jsonObject.putOpt("data", requestDTO.getData());
                                                 }
                                                 if (HzStringUtils.isNotBlank(requestDTO.getCode())) {
-                                                    jsonObject.set("code", requestDTO.getCode());
+                                                    jsonObject.putOpt("code", requestDTO.getCode());
                                                 }
-                                                data = jsonObject.toString();
                                             }
+                                        }
+                                        if (jsonObject != null) {
+                                            String content = jsonObject.getByPath("choices.delta.content", String.class);
+                                            if (HzStringUtils.isNotBlank(content) && content.length() > 5) {
+                                                // 处理指定回复一次性返回太多文本
+                                                for (int i = 0; i < content.length(); i++) {
+                                                    jsonObject.putByPath("choices.delta.content", StrUtil.sub(content, i, NumberUtil.max(i + 2, content.length())));
+                                                    emitter.send(jsonObject.toString());
+                                                }
+                                            } else {
+                                                emitter.send(jsonObject.toString());
+                                            }
+                                        } else {
                                             emitter.send(data);
                                         }
                                     } catch (IOException e) {
@@ -198,7 +216,6 @@ public class FastGPTService {
                                     }
                                 })
                                 .doOnComplete(() -> {
-                                    log.info("sse finish:{}", DateUtil.now());
                                     emitter.complete();
                                     if (HzStringUtils.isNotBlank(chatId)) {
                                         CACHE.remove(chatId);
@@ -212,7 +229,7 @@ public class FastGPTService {
                     .subscribe();
             return emitter;
         } catch (Exception e) {
-            log.info("path=[{}], params=[{}] error.", path, param, e);
+            log.error("path=[{}], params=[{}] error.", path, param, e);
             throw new RuntimeException(e);
         }
     }

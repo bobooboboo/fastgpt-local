@@ -5,9 +5,6 @@ import cn.org.atool.fluent.mybatis.annotation.TableField;
 import cn.org.atool.fluent.mybatis.annotation.TableId;
 import cn.org.atool.fluent.mybatis.base.BaseEntity;
 import com.hztech.config.IHzFmBaseMapper;
-import com.hztech.fastgpt.model.enums.EnumLawSource;
-import com.hztech.fastgpt.model.enums.EnumLawStatus;
-import com.hztech.fastgpt.model.enums.EnumLawType;
 import com.hztech.fluentmybatis.defaults.IBaseDefaultSetter;
 import com.hztech.model.po.base.IBaseDataObject;
 import lombok.Data;
@@ -20,7 +17,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 国家法律法规统计信息(root:this)
+ * 国家法律法规上位法信息(root:this)
  *
  * @author HZ
  */
@@ -28,13 +25,13 @@ import java.time.LocalDateTime;
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
 @FluentMybatis(
-        table = "law",
+        table = "higher_level_law",
         defaults = IBaseDefaultSetter.class,
         superMapper = IHzFmBaseMapper.class,
         mapperBeanPrefix = "",
         suffix = "DO"
 )
-public class LawDO extends BaseEntity implements Serializable,
+public class HigherLevelLawDO extends BaseEntity implements Serializable,
         IBaseDataObject<Long> {
 
     private static final long serialVersionUID = 1L;
@@ -50,15 +47,7 @@ public class LawDO extends BaseEntity implements Serializable,
     private Long id;
 
     /**
-     * 法律法规id
-     */
-    @TableField("outer_id")
-    @Length(max = 255)
-    @NotNull
-    private String outerId;
-
-    /**
-     * 标题
+     * 法律法规标题
      */
     @TableField("title")
     @Length(max = 255)
@@ -66,76 +55,54 @@ public class LawDO extends BaseEntity implements Serializable,
     private String title;
 
     /**
-     * 文件类型 EnumLawType [CONSTITUTION=0 宪法; STATUTE=1 法律; ADMINISTRATIVE_REGULATIONS=2 行政法规; SUPERVISION_REGULATIONS=3 监察法规; JUDICIAL_INTERPRETATION=4 司法解释; LOCAL_REGULATIONS=5 地方性法规]
+     * 向AI提出的问题
      */
-    @TableField("type")
-    @NotNull
-    private EnumLawType type;
-
-    /**
-     * 时效性 EnumLawStatus [NOT_EFFECTIVE=0 尚未生效; EFFECTIVE=1 有效; MODIFIED=2 已修改; REPEALED=3 已废止]
-     */
-    @TableField("status")
-    private EnumLawStatus status;
-
-    /**
-     * 主体
-     */
-    @TableField("subject")
+    @TableField("question")
     @Length(max = 255)
     @NotNull
-    private String subject;
+    private String question;
 
     /**
-     * 生效日期
+     * AI回复内容
      */
-    @TableField("effective")
-    @Length(max = 255)
-    private String effective;
-
-    /**
-     * 发布日期
-     */
-    @TableField("publish")
-    @Length(max = 255)
-    private String publish;
-
-    /**
-     * 数据源
-     */
-    @TableField("data_source")
+    @TableField("content")
+    @Length(max = 4000)
     @NotNull
-    private EnumLawSource dataSource;
+    private String content;
 
     /**
-     * doc附件地址
+     * 大模型平台
      */
-    @TableField("doc_file_url")
+    @TableField("platform")
     @Length(max = 255)
-    private String docFileUrl;
+    @NotNull
+    private String platform;
 
     /**
-     * pdf附件地址
+     * 大模型名称
      */
-    @TableField("pdf_file_url")
+    @TableField("model")
     @Length(max = 255)
-    private String pdfFileUrl;
+    @NotNull
+    private String model;
 
     /**
      * 创建时间
      */
     @TableField("create_time")
+    @NotNull
     private LocalDateTime createTime;
 
     /**
-     * 修改时间
+     * 更新时间
      */
     @TableField("modify_time")
+    @NotNull
     private LocalDateTime modifyTime;
 
 
     @Override
     public final Class<? extends BaseEntity> entityClass() {
-        return LawDO.class;
+        return HigherLevelLawDO.class;
     }
 }

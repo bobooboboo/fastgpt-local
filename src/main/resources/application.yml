@@ -17,7 +17,7 @@ fastgpt:
 
 
 server:
-  port: 8083
+  port: 8080
 spring:
   application:
     name: SpringbootFastGPTApplication

@@ -57,6 +57,9 @@
                         "type": "text",
                         "analyzer": "ik_max_word"
                     },
+                    "dataSource": {
+                        "type": "integer"
+                    },
                     "docFileUrl": {
                         "type": "keyword"
                     },

@@ -116,7 +116,7 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
             map.putAll(list.stream().collect(Collectors.groupingBy(LawContentResponseDTO::getOuterId, Collectors.mapping(LawContentResponseDTO::getContent, Collectors.joining("\n")))));
         }
         Map<String, String> fullContentMap = new HashMap<>();
-        if (BooleanUtil.isTrue(requestDTO.getFullContent())) {
+        if (BooleanUtil.isTrue(requestDTO.getFullContent()) && HzCollectionUtils.isNotEmpty(page.getRows())) {
             List<String> outerIds = page.getRows().stream().map(LawInfoSearchResponseDTO::getOuterId).collect(Collectors.toList());
             LawContentQuery lawContentQuery = lawContentMapperWrapper.query().select.outerId().content().end().where.outerId().in(outerIds).end();
             List<LawContentResponseDTO> list = lawContentMapperWrapper.findListByQuery(lawContentQuery, LawContentResponseDTO.class);
@@ -133,7 +133,10 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
             if (BooleanUtil.isTrue(requestDTO.getFullContent())) {
                 dto.setContent(fullContentMap.get(responseDTO.getOuterId()));
             }
-            dto.setFileUrl("http://192.168.1.13:8080" + StrUtil.blankToDefault(responseDTO.getPdfFileUrl(), responseDTO.getDocFileUrl()));
+            String fileUrl = StrUtil.blankToDefault(responseDTO.getPdfFileUrl(), responseDTO.getDocFileUrl());
+            if (HzStringUtils.isNotBlank(fileUrl)) {
+                dto.setFileUrl("http://192.168.1.13:8080" + fileUrl);
+            }
             return dto;
         }).collect(Collectors.toList()));
         return result;
@@ -276,6 +279,12 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
                 }
             }
             requestDTO.setSize(list.size() * 2L);
+        }
+        // 数据源
+        if (HzCollectionUtils.isNotEmpty(requestDTO.getDataSource())) {
+            LawInfoElasticSearchRequestDTO.Must terms = new LawInfoElasticSearchRequestDTO.Must("terms");
+            terms.set("dataSource", requestDTO.getDataSource().stream().map(EnumLawSource::getValue).collect(Collectors.toList()));
+            lawInfoElasticSearchRequestDTO.must(terms);
         }
         // 排序
         if (requestDTO.getSortType() == EnumLawSortType.PUBLISH_ASC) {
