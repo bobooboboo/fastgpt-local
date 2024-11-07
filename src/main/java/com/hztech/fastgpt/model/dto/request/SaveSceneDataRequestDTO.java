@@ -25,4 +25,6 @@ public class SaveSceneDataRequestDTO {
      * 场景code
      */
     private String code;
+
+    private Object userSelectData;
 }

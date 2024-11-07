@@ -1,13 +1,10 @@
 package com.hztech.fastgpt.controller;
 
 import cn.hutool.core.collection.ListUtil;
+import cn.hutool.core.util.StrUtil;
 import com.hztech.fastgpt.model.LawInfo;
-import com.hztech.fastgpt.model.dto.request.LawInfoSearchRequestDTO;
-import com.hztech.fastgpt.model.dto.request.LawPageRequestDTO;
-import com.hztech.fastgpt.model.dto.response.LawInfoSearchResponseDTO;
-import com.hztech.fastgpt.model.dto.response.LawInfoSearchV2ResponseDTO;
-import com.hztech.fastgpt.model.dto.response.LawPageResponseDTO;
-import com.hztech.fastgpt.model.dto.response.TempLawPageResponseDTO;
+import com.hztech.fastgpt.model.dto.request.*;
+import com.hztech.fastgpt.model.dto.response.*;
 import com.hztech.fastgpt.service.IHigherLevelLawService;
 import com.hztech.fastgpt.service.ILawContentService;
 import com.hztech.fastgpt.service.ILawService;
@@ -26,6 +23,7 @@ import springfox.documentation.annotations.ApiIgnore;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 国家法律法规库控制器
@@ -61,24 +59,42 @@ public class LawController {
         return HzResponse.success(lawService.lawPage(requestDTO));
     }
 
-    @GetMapping("/api/v1/law/page")
-    public HzResponse<HzPage<TempLawPageResponseDTO>> tempLawPage(LawPageRequestDTO requestDTO) {
-        return HzResponse.success(lawService.tempLawPage(requestDTO));
-    }
 
     @ApiIgnore
     @ApiOperation("创建索引")
     @PostMapping("/api/v1/createIndexAndMapping")
     public HzResponse<?> createIndexAndMapping() {
-        ClientInterface restClient = bossESStarter.getConfigRestClient("esmapper/createLawInfoIndex.xml");
-        String result = restClient.createIndiceMapping("law_info", "createLawInfoIndex");
+        return createIndexAndMapping(new CreateIndexAndMappingRequestDTO("createLawInfoIndex.xml", "law_info", "createLawInfoIndex"));
+    }
+
+    @ApiIgnore
+    @ApiOperation("创建索引")
+    @PostMapping("/api/v2/createIndexAndMapping")
+    public HzResponse<?> createIndexAndMapping(@RequestBody CreateIndexAndMappingRequestDTO requestDTO) {
+        ClientInterface restClient = bossESStarter.getConfigRestClient("esmapper/" + requestDTO.getConfigFileName());
+        String result = restClient.createIndiceMapping(requestDTO.getIndexName(), requestDTO.getIndexMapping());
         return HzResponse.success(result);
     }
+
+//    @GetMapping("/api/v1/proposal/dataset2es")
+//    public HzResponse<Void> proposalDataset2es() {
+//        ServiceRequests serviceRequests = HzSpringUtils.getBean(ServiceRequests.class);
+//        for (int i = 1; i <= 4; i++) {
+//            Map<String, Object> map = serviceRequests.listData("670680ed04a986474376fb75" , i, 30, null);
+//            List<ListDataResponseDTO> list = JSONUtil.parseObj(map).getJSONObject("data").getBeanList("data" , ListDataResponseDTO.class);
+//            List<ProposalInfo> proposalInfoList = list.stream().map(x -> ProposalInfo.parse(x.getA())).collect(Collectors.toList());
+//            ClientInterface restClient = bossESStarter.getRestClient();
+//            restClient.addDocuments("proposal_info" , proposalInfoList);
+//        }
+//        return HzResponse.success();
+//    }
 
     @ApiIgnore
     @ApiOperation("从DB同步数据到ES")
     @GetMapping("/api/v1/db2es")
-    public HzResponse<?> db2es(@RequestParam(value = "date", required = false) LocalDateTime date, @RequestParam(value = "minId", required = false) Long minId, @RequestParam(value = "maxId", required = false) Long maxId) {
+    public HzResponse<?> db2es(@RequestParam(value = "date", required = false) LocalDateTime date,
+                               @RequestParam(value = "minId", required = false) Long minId,
+                               @RequestParam(value = "maxId", required = false) Long maxId) {
         List<LawInfo> list = lawContentService.getAll(date, minId, maxId);
         List<List<LawInfo>> lawList = ListUtil.split(list, 10000);
         ClientInterface restClient = bossESStarter.getRestClient();
@@ -105,6 +121,57 @@ public class LawController {
         return HzResponse.success(higherLevelLawService.getHigherLevelLaw(title));
     }
 
+    @ApiOperation("查询收录的法律法规上位法的标题")
+    @GetMapping("/api/v1/getHigherLevelLawTitle")
+    public HzResponse<List<String>> getHigherLevelLawTitle() {
+        return HzResponse.success(higherLevelLawService.getHigherLevelLawTitle());
+    }
+
+    @ApiOperation("法律法规统计")
+    @PostMapping("/api/v1/law/statistics")
+    public HzResponse<Map<String, Long>> lawStatistics(@RequestBody LawStatisticsRequestDTO requestDTO) {
+        return HzResponse.success(lawService.lawStatistics(requestDTO));
+    }
+
+    @ApiOperation("法律法规统计")
+    @PostMapping("/api/v2/law/statistics")
+    public HzResponse<String> lawStatisticsV2(@RequestBody LawStatisticsRequestDTO requestDTO) {
+        return HzResponse.success(lawService.lawStatisticsV2(requestDTO));
+    }
+
+    @ApiOperation("下载法规文件")
+    @GetMapping("/api/v1/law/getLawInfo")
+    public HzResponse<LawPageResponseDTO> getLawInfo(@RequestParam("outerId") String outerId) {
+        if (outerId.endsWith("=")) {
+            outerId = StrUtil.replace(outerId, "=", "%3d");
+        }
+        return HzResponse.success(lawService.getLawInfo(outerId));
+    }
+
+
+//    @GetMapping("/api/v1/test")
+//    public void test() {
+//        LawDataUtils.articleSmart();
+//    }
+
+    @ApiOperation("法律法规检索（年份、时效性、制定机关）")
+    @PostMapping("/api/v1/law/queryLaw")
+    public HzResponse<QueryLawResponseDTO> queryLaw(@RequestBody QueryLawRequestDTO requestDTO) {
+        return HzResponse.success(lawService.queryLaw(requestDTO));
+    }
+
+    @ApiOperation("法规修订内容查询")
+    @PostMapping("/api/v1/law/getModifiedContent")
+    public HzResponse<ModifiedLawContentResponseDTO> getModifiedContent(@RequestBody QueryLawRequestDTO requestDTO) {
+        return HzResponse.success(lawService.getModifiedContent(requestDTO));
+    }
+
+    @GetMapping("/api/v1/rebuildLawContent")
+    public HzResponse<Void> rebuildLawContent() {
+        LawDataUtils.rebuildLawContent();
+        return HzResponse.success();
+    }
+
     //    @PostMapping("/api/v1/initHigherLevelLaw")
 //    public HzResponse<Void> initHigherLevelLaw() {
 //        higherLevelLawService.initHigherLevelLaw();
@@ -113,7 +180,8 @@ public class LawController {
 //
 //    @GetMapping("/api/v1/temp")
 //    public HzResponse<Void> temp() {
-//        LawDataUtils.temp();
+//        LawDataUtils.temp1();
+//        LawDataUtils.temp2();
 //        return HzResponse.success();
 //    }
 }

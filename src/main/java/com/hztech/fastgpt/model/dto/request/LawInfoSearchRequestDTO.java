@@ -1,11 +1,11 @@
 package com.hztech.fastgpt.model.dto.request;
 
+import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.hztech.fastgpt.model.enums.*;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-import javax.validation.constraints.NotBlank;
 import java.util.List;
 
 /**
@@ -17,7 +17,6 @@ import java.util.List;
 @Data
 public class LawInfoSearchRequestDTO {
 
-    @NotBlank(message = "请输入检索内容")
     @ApiModelProperty(value = "检索内容")
     private String text;
 
@@ -95,11 +94,29 @@ public class LawInfoSearchRequestDTO {
      */
     private List<EnumLawSource> dataSource;
 
+    private String city;
+
     public String getPublishBegin() {
         return StrUtil.emptyToNull(publishBegin);
     }
 
     public String getPublishEnd() {
         return StrUtil.emptyToNull(publishEnd);
+    }
+
+    public Integer getArticle() {
+        return ObjectUtil.equal(article, 0) ? null : article;
+    }
+
+    public Integer getSection() {
+        return ObjectUtil.equal(section, 0) ? null : section;
+    }
+
+    public Integer getChapter() {
+        return ObjectUtil.equal(chapter, 0) ? null : chapter;
+    }
+
+    public Integer getPart() {
+        return ObjectUtil.equal(part, 0) ? null : part;
     }
 }

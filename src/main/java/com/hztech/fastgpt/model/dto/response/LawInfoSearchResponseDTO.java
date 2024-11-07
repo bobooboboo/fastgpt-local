@@ -14,6 +14,8 @@ import lombok.Data;
 @Data
 public class LawInfoSearchResponseDTO {
 
+    private Long id;
+
     private String outerId;
 
     /**
@@ -51,6 +53,9 @@ public class LawInfoSearchResponseDTO {
      */
     @ApiModelProperty("章节内容")
     private String content;
+
+    @ApiModelProperty("制定机关")
+    private String subject;
 
     /**
      * 附件地址

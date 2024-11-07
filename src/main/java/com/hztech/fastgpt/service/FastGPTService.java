@@ -2,6 +2,9 @@ package com.hztech.fastgpt.service;
 
 import cn.hutool.cache.Cache;
 import cn.hutool.cache.CacheUtil;
+import cn.hutool.core.collection.ListUtil;
+import cn.hutool.core.thread.ThreadUtil;
+import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
@@ -107,7 +110,8 @@ public class FastGPTService {
         Map<String, Object> resultMap = serviceRequests.createCollection(datasetId, null, data.getId(), "virtual", null);
         String collectionId = JSONUtil.parseObj(resultMap).getStr("data");
         // 插入新数据
-        serviceRequests.pushData(collectionId, "chunk", null, data.getData());
+        ListUtil.split(data.getData(), 200).forEach(list -> serviceRequests.pushData(collectionId, "chunk", null, list));
+//        serviceRequests.pushData(collectionId, "chunk", null, data.getData());
     }
 
     private String getDatasetId(EnumBusinessType type) {
@@ -137,10 +141,10 @@ public class FastGPTService {
      */
     public SseEmitter chatCompletionsStream(String chatId, Map<String, String> variables,
                                             List<ChatMessage> messages) {
-        if (log.isDebugEnabled()) {
-            log.debug("request chatCompletionsStream chatId={}, stream={}, variables={}, messages={}",
-                    chatId, true, variables, messages);
-        }
+//        if (log.isDebugEnabled()) {
+        log.info("request chatCompletionsStream chatId={}, stream={}, variables={}, messages={}",
+                chatId, true, variables, JSONUtil.toJsonStr(messages));
+//        }
         JSONObject param = new JSONObject();
         param.set("chatId", chatId);
         param.set("stream", true);
@@ -178,32 +182,41 @@ public class FastGPTService {
                                 .bodyToFlux(String.class)
                                 .doOnNext(data -> {
                                     try {
-                                        JSONObject jsonObject = null;
-                                        if (HzStringUtils.isNotBlank(data)) {
-                                            if (HzStringUtils.isNotBlank(chatId) && CACHE.containsKey(chatId) && !HzStringUtils.equals("[DONE]", data) && JSONUtil.isTypeJSON(data)) {
-                                                SaveSceneDataRequestDTO requestDTO = CACHE.get(chatId);
-                                                jsonObject = JSONUtil.parseObj(data);
-                                                if (ObjectUtil.isNotEmpty(requestDTO.getData())) {
-                                                    jsonObject.putOpt("data", requestDTO.getData());
-                                                }
-                                                if (HzStringUtils.isNotBlank(requestDTO.getCode())) {
-                                                    jsonObject.putOpt("code", requestDTO.getCode());
+                                        if (HzStringUtils.equals("[DONE]", data)) {
+                                            emitter.send(data);
+                                        } else {
+                                            JSONObject jsonObject = JSONUtil.parseObj(data);
+                                            if (HzStringUtils.isNotBlank(data)) {
+                                                if (HzStringUtils.isNotBlank(chatId) && CACHE.containsKey(chatId) && JSONUtil.isTypeJSON(data)) {
+                                                    SaveSceneDataRequestDTO requestDTO = CACHE.get(chatId);
+                                                    jsonObject = JSONUtil.parseObj(data);
+                                                    if (ObjectUtil.isNotEmpty(requestDTO.getData())) {
+                                                        jsonObject.putOpt("data", requestDTO.getData());
+                                                    }
+                                                    if (HzStringUtils.isNotBlank(requestDTO.getCode())) {
+                                                        jsonObject.putOpt("code", requestDTO.getCode());
+                                                    }
+                                                    if (ObjectUtil.isNotEmpty(requestDTO.getUserSelectData())) {
+                                                        jsonObject.putOpt("userSelectData", requestDTO.getUserSelectData());
+                                                    }
                                                 }
                                             }
-                                        }
-                                        if (jsonObject != null) {
-                                            String content = jsonObject.getByPath("choices.delta.content", String.class);
-                                            if (HzStringUtils.isNotBlank(content) && content.length() > 5) {
-                                                // 处理指定回复一次性返回太多文本
-                                                for (int i = 0; i < content.length(); i++) {
-                                                    jsonObject.putByPath("choices.delta.content", StrUtil.sub(content, i, NumberUtil.max(i + 2, content.length())));
+                                            JSONObject delta = jsonObject.getByPath("choices[0].delta", JSONObject.class);
+                                            if (delta == null || delta.isEmpty()) {
+                                                emitter.send(jsonObject.toString());
+                                            } else {
+                                                String content = delta.getStr("content");
+                                                if (HzStringUtils.isNotBlank(content) && content.length() > 5) {
+                                                    // 处理指定回复一次性返回太多文本
+                                                    for (int i = 0; i < content.length(); i += 2) {
+                                                        jsonObject.putByPath("choices[0].delta.content", StrUtil.sub(content, i, NumberUtil.min(i + 2, content.length())));
+                                                        emitter.send(jsonObject.toString());
+                                                        ThreadUtil.safeSleep(10);
+                                                    }
+                                                } else {
                                                     emitter.send(jsonObject.toString());
                                                 }
-                                            } else {
-                                                emitter.send(jsonObject.toString());
                                             }
-                                        } else {
-                                            emitter.send(data);
                                         }
                                     } catch (IOException e) {
                                         log.error("Event Stream Exception:", e);
@@ -239,13 +252,43 @@ public class FastGPTService {
     }
 
     @SneakyThrows
-    public Boolean uploadFile(String datasetId, String parentId, MultipartFile file) {
+    public Map<String, Object> uploadFile(String datasetId, String parentId, MultipartFile file) {
         String originalFilename = file.getOriginalFilename();
         if (!StrUtil.endWithAny(originalFilename, ".pdf", ".doc", ".docx", ".md", ".txt", ".html", ".csv")) {
             throw new HzRuntimeException("不支持的文件格式");
         }
-        serviceRequests.createFileCollection(file.getBytes(), originalFilename, datasetId, parentId, null, "chunk", 500, null, null);
-        return true;
+        return serviceRequests.createFileCollection(file.getBytes(), originalFilename, datasetId, parentId, null, "chunk", 500, null, null);
+    }
+
+    @SneakyThrows
+    public List<String> createFileCollection(String datasetId, String parentId, MultipartFile file) {
+        List<String> collectionIds = new ArrayList<>();
+        String originalFilename = file.getOriginalFilename();
+        if (!StrUtil.endWithAny(originalFilename, ".pdf", ".doc", ".docx", ".md", ".txt", ".html", ".csv")) {
+            throw new HzRuntimeException("不支持的文件格式");
+        }
+        doCreateFileCollection(file.getBytes(), originalFilename, datasetId, parentId, "chunk", collectionIds);
+//        doCreateFileCollection(file.getBytes(), originalFilename, datasetId, parentId, "qa", collectionIds);
+        return collectionIds;
+    }
+
+    private void doCreateFileCollection(byte[] bytes, String originalFilename, String datasetId, String parentId, String trainingType, List<String> collectionIds) {
+        Map<String, Object> map = serviceRequests.createFileCollection(bytes, originalFilename, datasetId, parentId, null, trainingType, 500, null, null);
+        String collectionId = JSONUtil.parseObj(map).getByPath("data.collectionId", String.class);
+        if (HzStringUtils.isNotBlank(collectionId)) {
+            collectionIds.add(collectionId);
+        }
+    }
+
+    public Boolean deleteCollections(List<String> collectionIds) {
+        Boolean result = Boolean.TRUE;
+        for (String collectionId : collectionIds) {
+            Map<String, Object> map = serviceRequests.deleteCollection(collectionId);
+            JSONObject jsonObject = JSONUtil.parseObj(map);
+            result = BooleanUtil.and(result, ObjectUtil.equals(jsonObject.get("code"), 200));
+            log.info("删除集合{}：{}", collectionId, jsonObject);
+        }
+        return result;
     }
 
     public List<ListDatasetResponseDTO> listDataset(String parentId) {
@@ -258,6 +301,12 @@ public class FastGPTService {
 
 
     public void saveSceneData(SaveSceneDataRequestDTO requestDTO) {
+        log.info("saveSceneData:{}", JSONUtil.toJsonStr(requestDTO));
         CACHE.put(requestDTO.getChatId(), requestDTO);
     }
+
+    public Object getSceneData(String chatId) {
+        return CACHE.get(chatId).getData();
+    }
+
 }

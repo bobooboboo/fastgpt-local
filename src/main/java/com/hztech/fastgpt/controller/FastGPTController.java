@@ -45,10 +45,34 @@ public class FastGPTController {
      * @param file 文件
      */
     @PostMapping("/api/v1/uploadFile")
-    public HzResponse<Boolean> uploadFile(@RequestParam("datasetId") String datasetId,
-                                          @RequestParam(value = "parentId", required = false) String parentId,
-                                          @RequestPart("file") MultipartFile file) {
+    public HzResponse<Map<String, Object>> uploadFile(@RequestParam("datasetId") String datasetId,
+                                                      @RequestParam(value = "parentId", required = false) String parentId,
+                                                      @RequestPart("file") MultipartFile file) {
         return HzResponse.success(fastGPTService.uploadFile(datasetId, parentId, file));
+    }
+
+    /**
+     * 创建文件集合
+     *
+     * @param datasetId 知识库id
+     * @param parentId 文件夹id
+     * @param file 文件
+     */
+    @PostMapping("/api/v1/createFileCollection")
+    public HzResponse<List<String>> createFileCollection(@RequestParam("datasetId") String datasetId,
+                                                         @RequestParam(value = "parentId", required = false) String parentId,
+                                                         @RequestPart("file") MultipartFile file) {
+        return HzResponse.success(fastGPTService.createFileCollection(datasetId, parentId, file));
+    }
+
+    /**
+     * 删除文件集合
+     *
+     * @param collectionIds 集合id
+     */
+    @PostMapping("/api/v1/deleteCollections")
+    public HzResponse<Boolean> deleteCollections(@RequestBody List<String> collectionIds) {
+        return HzResponse.success(fastGPTService.deleteCollections(collectionIds));
     }
 
     /**
@@ -102,4 +126,8 @@ public class FastGPTController {
         return HzResponse.success();
     }
 
+    @GetMapping("/api/v1/chat/getSceneData")
+    public HzResponse<Object> getSceneData(@RequestParam("chatId") String chatId) {
+        return HzResponse.success(fastGPTService.getSceneData(chatId));
+    }
 }

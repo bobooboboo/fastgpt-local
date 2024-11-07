@@ -12,7 +12,7 @@ import com.hztech.util.HzEnumUtils;
  * @author HZ
  */
 public enum EnumLawType implements IIntegerEnum {
-
+    NONE(-1, "未知"),
     /**
      * 宪法
      */

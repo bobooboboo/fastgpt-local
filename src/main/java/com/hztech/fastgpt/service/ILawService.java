@@ -3,12 +3,13 @@ package com.hztech.fastgpt.service;
 import com.hztech.fastgpt.dao.po.LawDO;
 import com.hztech.fastgpt.model.dto.request.LawInfoSearchRequestDTO;
 import com.hztech.fastgpt.model.dto.request.LawPageRequestDTO;
-import com.hztech.fastgpt.model.dto.response.LawInfoSearchResponseDTO;
-import com.hztech.fastgpt.model.dto.response.LawInfoSearchV2ResponseDTO;
-import com.hztech.fastgpt.model.dto.response.LawPageResponseDTO;
-import com.hztech.fastgpt.model.dto.response.TempLawPageResponseDTO;
+import com.hztech.fastgpt.model.dto.request.LawStatisticsRequestDTO;
+import com.hztech.fastgpt.model.dto.request.QueryLawRequestDTO;
+import com.hztech.fastgpt.model.dto.response.*;
 import com.hztech.model.dto.HzPage;
 import com.hztech.service.transactionscript.IHzTransactionScriptService;
+
+import java.util.Map;
 
 /**
  * ILawService 服务接口
@@ -32,4 +33,28 @@ public interface ILawService extends IHzTransactionScriptService<LawDO, Long> {
     HzPage<LawInfoSearchResponseDTO> search(LawInfoSearchRequestDTO requestDTO);
 
     HzPage<LawInfoSearchV2ResponseDTO> searchV2(LawInfoSearchRequestDTO requestDTO);
+
+    /**
+     * 法规统计
+     */
+    Map<String, Long> lawStatistics(LawStatisticsRequestDTO requestDTO);
+
+//    /**
+//     * 下载法规文件
+//     */
+//    ResponseEntity<StreamingResponseBody> downloadFile(String id);
+
+    /**
+     * 已修订法规查询
+     */
+    QueryLawResponseDTO queryLaw(QueryLawRequestDTO requestDTO);
+
+    /**
+     * 查询法规修订内容
+     */
+    ModifiedLawContentResponseDTO getModifiedContent(QueryLawRequestDTO requestDTO);
+
+    LawPageResponseDTO getLawInfo(String outerId);
+
+    String lawStatisticsV2(LawStatisticsRequestDTO requestDTO);
 }

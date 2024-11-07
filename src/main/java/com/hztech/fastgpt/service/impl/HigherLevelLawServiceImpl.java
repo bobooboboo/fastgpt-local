@@ -71,4 +71,10 @@ public class HigherLevelLawServiceImpl extends HzBaseTransactionScriptService<IH
             mapper.insertBatch(higherLevelLawList);
         }
     }
+
+    @Override
+    public List<String> getHigherLevelLawTitle() {
+        HigherLevelLawQuery query = mapper.query().select.title().end().groupBy.title().end();
+        return mapper.findFieldListByQuery(query);
+    }
 }

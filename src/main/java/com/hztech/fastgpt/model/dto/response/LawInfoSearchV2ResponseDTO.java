@@ -31,4 +31,7 @@ public class LawInfoSearchV2ResponseDTO {
      */
     private String fileUrl;
 
+    private String publish;
+
+    private String subject;
 }

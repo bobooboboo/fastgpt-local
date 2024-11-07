@@ -1,18 +1,28 @@
 package com.hztech.fastgpt.util;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DatePattern;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.lang.mutable.MutableObj;
-import cn.hutool.core.util.RandomUtil;
-import cn.hutool.core.util.ReUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.http.ContentType;
-import cn.hutool.http.HttpRequest;
-import cn.hutool.http.HttpResponse;
-import cn.hutool.http.HttpStatus;
+import cn.hutool.core.text.StrSplitter;
+import cn.hutool.core.util.*;
+import cn.hutool.http.*;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.hztech.fastgpt.dao.po.ArticleSmartDO;
+import com.hztech.fastgpt.dao.po.LawContentBakDO;
 import com.hztech.fastgpt.dao.po.LawContentDO;
 import com.hztech.fastgpt.dao.po.LawDO;
+import com.hztech.fastgpt.dao.wrapper.LawContentBakQuery;
+import com.hztech.fastgpt.dao.wrapper.LawContentQuery;
+import com.hztech.fastgpt.dao.wrapper.LawQuery;
+import com.hztech.fastgpt.mapper.wrapper.ArticleSmartMapperWrapper;
+import com.hztech.fastgpt.mapper.wrapper.LawContentBakMapperWrapper;
+import com.hztech.fastgpt.mapper.wrapper.LawContentMapperWrapper;
+import com.hztech.fastgpt.mapper.wrapper.LawMapperWrapper;
 import com.hztech.fastgpt.model.dto.response.CountryLawBasicDataResponseDTO;
 import com.hztech.fastgpt.model.dto.response.CountryLawDetailDataResponseDTO;
 import com.hztech.fastgpt.model.dto.response.LawDetailResponseDTO;
@@ -28,14 +38,18 @@ import com.spire.doc.Document;
 import com.spire.doc.FileFormat;
 import com.spire.doc.Section;
 import com.spire.doc.documents.Paragraph;
+import com.spire.doc.documents.TextSelection;
 import lombok.Cleanup;
 import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Jsoup;
 import org.slf4j.MDC;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -415,7 +429,7 @@ public class LawDataUtils {
             Integer part = null, chapter = null, section = null, article;
             for (int j = 0; j < documentSection.getParagraphs().getCount(); j++) {
                 Paragraph paragraph = documentSection.getParagraphs().get(j);
-                String text = paragraph.getText();
+                String text = paragraph.getListText() + paragraph.getText();
                 if (HzStringUtils.equals("Evaluation Warning: The document was created with Spire.Doc for JAVA.", text)) {
                     continue;
                 }
@@ -430,13 +444,51 @@ public class LawDataUtils {
                     LawDetailResponseDTO lawDetailResponseDTO = new LawDetailResponseDTO();
                     StringBuilder stringBuilder = new StringBuilder(text);
                     int tempIndex = j + 1;
-                    String tempText = documentSection.getParagraphs().get(tempIndex).getText();
+                    String tempText = documentSection.getParagraphs().get(tempIndex).getListText() + documentSection.getParagraphs().get(tempIndex).getText();
+                    while (isBlank(tempText)) {
+                        tempIndex++;
+                        tempText = documentSection.getParagraphs().get(tempIndex).getListText() + documentSection.getParagraphs().get(tempIndex).getText();
+                    }
+                    Pattern firstLinePattern = null;
+                    Integer firstLineIndex = null;
                     while (tempIndex < documentSection.getParagraphs().getCount() && !isBlank(tempText)) {
+                        if (firstLinePattern == null && firstLineIndex == null) {
+                            if (ReUtil.isMatch(PART_PATTERN, tempText)) {
+                                // 编
+                                firstLinePattern = PART_PATTERN;
+                                firstLineIndex = ChineseToNumberUtils.convertNumber(ReUtil.getGroup1(PART_PATTERN, tempText));
+                            } else if (ReUtil.isMatch(CHAPTER_PATTERN, tempText)) {
+                                // 章
+                                firstLinePattern = CHAPTER_PATTERN;
+                                firstLineIndex = ChineseToNumberUtils.convertNumber(ReUtil.getGroup1(CHAPTER_PATTERN, tempText));
+                            } else if (ReUtil.isMatch(SECTION_PATTERN, tempText)) {
+                                // 节
+                                firstLinePattern = SECTION_PATTERN;
+                                firstLineIndex = ChineseToNumberUtils.convertNumber(ReUtil.getGroup1(SECTION_PATTERN, tempText));
+                            } else if (ReUtil.isMatch(ARTICLE_PATTERN, tempText)) {
+                                // 条
+                                firstLinePattern = ARTICLE_PATTERN;
+                                firstLineIndex = ChineseToNumberUtils.convertNumber(ReUtil.get(ARTICLE_PATTERN, tempText, 2));
+                            }
+                        } else {
+                            if (ReUtil.isMatch(PART_PATTERN, tempText) && ObjectUtil.equals(firstLineIndex, ChineseToNumberUtils.convertNumber(ReUtil.getGroup1(PART_PATTERN, tempText)))) {
+                                break;
+                            } else if (ReUtil.isMatch(CHAPTER_PATTERN, tempText) && ObjectUtil.equals(firstLineIndex, ChineseToNumberUtils.convertNumber(ReUtil.getGroup1(CHAPTER_PATTERN, tempText)))) {
+                                // 章
+                                break;
+                            } else if (ReUtil.isMatch(SECTION_PATTERN, tempText) && ObjectUtil.equals(firstLineIndex, ChineseToNumberUtils.convertNumber(ReUtil.getGroup1(SECTION_PATTERN, tempText)))) {
+                                // 节
+                                break;
+                            } else if (ReUtil.isMatch(ARTICLE_PATTERN, tempText) && ObjectUtil.equals(firstLineIndex, ChineseToNumberUtils.convertNumber(ReUtil.get(ARTICLE_PATTERN, tempText, 2)))) {
+                                // 条
+                                break;
+                            }
+                        }
                         stringBuilder.append("\n");
                         stringBuilder.append(tempText);
                         tempIndex++;
                         if (tempIndex < documentSection.getParagraphs().getCount()) {
-                            tempText = documentSection.getParagraphs().get(tempIndex).getText();
+                            tempText = documentSection.getParagraphs().get(tempIndex).getListText() + documentSection.getParagraphs().get(tempIndex).getText();
                         } else {
                             break;
                         }
@@ -469,7 +521,7 @@ public class LawDataUtils {
                 } else if (ReUtil.isMatch(ARTICLE_PATTERN, text)) {
                     // 条
                     article = ChineseToNumberUtils.convertNumber(ReUtil.get(ARTICLE_PATTERN, text, 2));
-                    boolean hasMore = text.endsWith("：") || (j + 1 < documentSection.getParagraphs().getCount() && noneMatch(documentSection.getParagraphs().get(j + 1).getText(), PART_PATTERN, CHAPTER_PATTERN, SECTION_PATTERN, ARTICLE_PATTERN));
+                    boolean hasMore = text.endsWith("：") || (j + 1 < documentSection.getParagraphs().getCount() && noneMatch(documentSection.getParagraphs().get(j + 1).getListText() + documentSection.getParagraphs().get(j + 1).getText(), PART_PATTERN, CHAPTER_PATTERN, SECTION_PATTERN, ARTICLE_PATTERN));
                     if (hasMore) {
                         if (text.startsWith("　　")) {
                             text = text.substring(2);
@@ -477,7 +529,7 @@ public class LawDataUtils {
                         // 说明还有具体的小条例或者更多信息
                         StringBuilder stringBuilder = new StringBuilder(text);
                         int tempIndex = j + 1;
-                        String tempText = documentSection.getParagraphs().get(tempIndex).getText();
+                        String tempText = documentSection.getParagraphs().get(tempIndex).getListText() + documentSection.getParagraphs().get(tempIndex).getText();
                         // 继续读取小条例或者更多信息
                         while (tempIndex < documentSection.getParagraphs().getCount() && noneMatch(tempText, PART_PATTERN, CHAPTER_PATTERN, SECTION_PATTERN, ARTICLE_PATTERN)) {
                             if (tempText.startsWith("　　")) {
@@ -487,7 +539,7 @@ public class LawDataUtils {
                             stringBuilder.append(tempText);
                             tempIndex++;
                             if (tempIndex < documentSection.getParagraphs().getCount()) {
-                                tempText = documentSection.getParagraphs().get(tempIndex).getText();
+                                tempText = documentSection.getParagraphs().get(tempIndex).getListText() + documentSection.getParagraphs().get(tempIndex).getText();
                             } else {
                                 break;
                             }
@@ -505,11 +557,11 @@ public class LawDataUtils {
                     lawDetailResponseDTO.setContentType(EnumLawContentType.FOREWORD);
                     StringBuilder stringBuilder = new StringBuilder(text).append("\n");
                     int tempIndex = j + 1;
-                    String tempText = documentSection.getParagraphs().get(tempIndex).getText();
+                    String tempText = documentSection.getParagraphs().get(tempIndex).getListText() + documentSection.getParagraphs().get(tempIndex).getText();
                     // 序言下一行为空 但是不确定是否只空一行 这里用while循环匹配到第一行非空序言
                     while (HzStringUtils.isBlank(tempText)) {
                         tempIndex++;
-                        tempText = documentSection.getParagraphs().get(tempIndex).getText();
+                        tempText = documentSection.getParagraphs().get(tempIndex).getListText() + documentSection.getParagraphs().get(tempIndex).getText();
                     }
                     // 到了这里肯定是非空序言开头
                     while (true) {
@@ -518,7 +570,7 @@ public class LawDataUtils {
                         }
                         stringBuilder.append(tempText);
                         tempIndex++;
-                        tempText = documentSection.getParagraphs().get(tempIndex).getText();
+                        tempText = documentSection.getParagraphs().get(tempIndex).getListText() + documentSection.getParagraphs().get(tempIndex).getText();
                         if (HzStringUtils.isBlank(tempText)) {
                             // 最后一行序言结束 下一行为空行 说明序言结束
                             break;
@@ -555,7 +607,7 @@ public class LawDataUtils {
             // 当前编、章、节、条数值
             for (int j = 0; j < documentSection.getParagraphs().getCount(); j++) {
                 Paragraph paragraph = documentSection.getParagraphs().get(j);
-                String text = paragraph.getText();
+                String text = paragraph.getListText() + paragraph.getText();
                 if (HzStringUtils.equals("Evaluation Warning: The document was created with Spire.Doc for JAVA.", text)) {
                     continue;
                 }
@@ -575,6 +627,13 @@ public class LawDataUtils {
      */
     public static List<LawDetailResponseDTO> readFromDocx(String path, FileFormat fileFormat) {
         Document document = new Document(getFileStream(path), fileFormat);
+        return readFromDocx(document);
+    }
+
+    /**
+     * 从word文件中读取内容
+     */
+    public static List<LawDetailResponseDTO> readFromDocx(Document document) {
         if (document.findPattern(ARTICLE_PATTERN) != null) {
             return readFromDocxWithArticlePattern(document);
         }
@@ -687,25 +746,346 @@ public class LawDataUtils {
         return response;
     }
 
-    public static void temp() {
-        List<File> files = FileUtil.loopFiles("C:\\Users\\PC_Admin\\Desktop\\杭州工作制度");
-        for (File file : files) {
+//    public static void main(String[] args) {
+//        temp2();
+////        PdfDocument pdfDocument = new PdfDocument("C:\\Users\\PC_Admin\\Documents\\2024_10_08_目录\\一、议事规则.pdf");
+////        pdfDocument.saveToFile("C:\\Users\\PC_Admin\\Documents\\2024_10_08_目录\\一、议事规则2.docx", com.spire.pdf.FileFormat.DOCX);
+//    }
+//
+//    public static void temp1() {
+//        List<File> files = FileUtil.loopFiles("C:\\Users\\PC_Admin\\Documents\\2024_10_08_四、监督工作(1)\\with_pattern");
+//        for (File file : files) {
+////            if (file.getName().startsWith("~") || !file.getName().startsWith("杭州市人大新闻宣传工作规定")) {
+////                continue;
+////            }
+//            LawDO lawDO = new LawDO();
+//            lawDO.setOuterId("random_" + RandomUtil.randomString(20));
+//            lawDO.setTitle(file.getName().replace(".docx", ""));
+//            lawDO.setType(EnumLawType.LOCAL_REGULATIONS);
+//            lawDO.setStatus(EnumLawStatus.EFFECTIVE);
+//            lawDO.setSubject("");
+//            lawDO.setDataSource(EnumLawSource.MEASURES_FOR_THE_ESTABLISHMENT_OF_LOCAL_REGULATIONS_IN_HANGZHOU);
+////            lawDO.setDocFileUrl();
+////            lawDO.setPdfFileUrl();
+//            HzSpringUtils.getBean(ILawService.class).save(lawDO);
+//            Document document = new Document(file.getAbsolutePath(), FileFormat.Docx);
+//            List<LawDetailResponseDTO> list = readFromDocxWithArticlePatternV2(document);
+//            List<LawContentDO> lawContentList = list.stream().map(responseDTO -> {
+//                LawContentDO contentDO = new LawContentDO();
+//                contentDO.setOuterId(lawDO.getOuterId());
+//                contentDO.setType(lawDO.getType());
+//                contentDO.setStatus(lawDO.getStatus());
+//                contentDO.setTitle(lawDO.getTitle());
+//                contentDO.setSubject(lawDO.getSubject());
+//                contentDO.setPart(responseDTO.getPart());
+//                contentDO.setChapter(responseDTO.getChapter());
+//                contentDO.setSection(responseDTO.getSection());
+//                contentDO.setArticle(responseDTO.getArticle());
+//                contentDO.setContentType(responseDTO.getContentType());
+//                contentDO.setContent(responseDTO.getContent());
+//                contentDO.setDataSource(lawDO.getDataSource());
+//                return contentDO;
+//            }).collect(Collectors.toList());
+//            HzSpringUtils.getBean(ILawContentService.class).insertBatch(lawContentList);
+//        }
+//    }
+//
+//    public static void temp2() {
+//        List<File> files = FileUtil.loopFiles("C:\\Users\\PC_Admin\\Documents\\2024_10_08_四、监督工作(1)\\without_pattern");
+//        for (File file : files) {
+////            if (file.getName().startsWith("~") || !file.getName().startsWith("杭州市人大信息工作计分办法")) {
+////                continue;
+////            }
+//            LawDO lawDO = new LawDO();
+//            lawDO.setOuterId("random_" + RandomUtil.randomString(20));
+//            lawDO.setTitle(file.getName().replace(".docx", ""));
+//            lawDO.setType(EnumLawType.LOCAL_REGULATIONS);
+//            lawDO.setStatus(EnumLawStatus.EFFECTIVE);
+//            lawDO.setSubject("");
+//            lawDO.setDataSource(EnumLawSource.MEASURES_FOR_THE_ESTABLISHMENT_OF_LOCAL_REGULATIONS_IN_HANGZHOU);
+////            lawDO.setDocFileUrl();
+////            lawDO.setPdfFileUrl();
+//            HzSpringUtils.getBean(ILawService.class).save(lawDO);
+//            Document document = new Document(file.getAbsolutePath(), FileFormat.Docx);
+//            List<LawDetailResponseDTO> list = readFromDocxWithoutPatternV2(document);
+//            List<LawContentDO> lawContentList = list.stream().map(responseDTO -> {
+//                LawContentDO contentDO = new LawContentDO();
+//                contentDO.setOuterId(lawDO.getOuterId());
+//                contentDO.setType(lawDO.getType());
+//                contentDO.setStatus(lawDO.getStatus());
+//                contentDO.setTitle(lawDO.getTitle());
+//                contentDO.setSubject(lawDO.getSubject());
+//                contentDO.setPart(responseDTO.getPart());
+//                contentDO.setChapter(responseDTO.getChapter());
+//                contentDO.setSection(responseDTO.getSection());
+//                contentDO.setArticle(responseDTO.getArticle());
+//                contentDO.setContentType(responseDTO.getContentType());
+//                contentDO.setContent(responseDTO.getContent());
+//                contentDO.setDataSource(lawDO.getDataSource());
+//                return contentDO;
+//            }).collect(Collectors.toList());
+//            HzSpringUtils.getBean(ILawContentService.class).insertBatch(lawContentList);
+//        }
+//    }
+//
+
+    /**
+     * 读取正常格式的docx
+     *
+     * @param document docx文档
+     */
+    @SuppressWarnings("all")
+    private static List<LawDetailResponseDTO> readFromDocxWithArticlePatternV2(Document document) {
+        List<LawDetailResponseDTO> result = new ArrayList<>();
+        String allText = document.getText();
+        List<String> list = StrSplitter.split(allText, "\n", true, false);
+        Integer part = null, chapter = null, section = null, article;
+        for (int i = 0; i < list.size(); i++) {
+            // 当前编、章、节、条数值
+            String text = list.get(i);
+            if (HzStringUtils.equals("Evaluation Warning: The document was created with Spire.Doc for JAVA.", text)) {
+                continue;
+            }
+            if (isBlank(text)) {
+                LawDetailResponseDTO lawDetailResponseDTO = new LawDetailResponseDTO();
+                lawDetailResponseDTO.setContent(text);
+                lawDetailResponseDTO.setContentType(EnumLawContentType.EMPTY_LINE);
+                result.add(lawDetailResponseDTO);
+                continue;
+            }
+            if (ReUtil.isMatch(CATALOGUE_REGEX, text)) {
+                LawDetailResponseDTO lawDetailResponseDTO = new LawDetailResponseDTO();
+                StringBuilder stringBuilder = new StringBuilder(text);
+                int tempIndex = i + 1;
+                String tempText = list.get(tempIndex);
+                while (isBlank(tempText)) {
+                    tempIndex++;
+                    tempText = list.get(tempIndex);
+                }
+                while (tempIndex < list.size() && !isBlank(tempText)) {
+                    stringBuilder.append("\n");
+                    stringBuilder.append(tempText);
+                    tempIndex++;
+                    if (tempIndex < list.size()) {
+                        tempText = list.get(tempIndex);
+                    } else {
+                        break;
+                    }
+                }
+                i = tempIndex - 1;
+                lawDetailResponseDTO.setContent(stringBuilder.toString());
+                lawDetailResponseDTO.setContentType(EnumLawContentType.OTHER);
+                result.add(lawDetailResponseDTO);
+                continue;
+            }
+            LawDetailResponseDTO lawDetailResponseDTO = new LawDetailResponseDTO();
+            if (ReUtil.isMatch(PART_PATTERN, text)) {
+                // 编
+                part = ChineseToNumberUtils.convertNumber(ReUtil.getGroup1(PART_PATTERN, text));
+                lawDetailResponseDTO.setContentType(EnumLawContentType.PART);
+                lawDetailResponseDTO.setPart(part);
+            } else if (ReUtil.isMatch(CHAPTER_PATTERN, text)) {
+                // 章
+                chapter = ChineseToNumberUtils.convertNumber(ReUtil.getGroup1(CHAPTER_PATTERN, text));
+                lawDetailResponseDTO.setContentType(EnumLawContentType.CHAPTER);
+                lawDetailResponseDTO.setPart(part);
+                lawDetailResponseDTO.setChapter(chapter);
+            } else if (ReUtil.isMatch(SECTION_PATTERN, text)) {
+                // 节
+                section = ChineseToNumberUtils.convertNumber(ReUtil.getGroup1(SECTION_PATTERN, text));
+                lawDetailResponseDTO.setContentType(EnumLawContentType.SECTION);
+                lawDetailResponseDTO.setPart(part);
+                lawDetailResponseDTO.setChapter(chapter);
+                lawDetailResponseDTO.setSection(section);
+            } else if (ReUtil.isMatch(ARTICLE_PATTERN, text)) {
+                // 条
+                article = ChineseToNumberUtils.convertNumber(ReUtil.get(ARTICLE_PATTERN, text, 2));
+                boolean hasMore = text.endsWith("：") || (i + 1 < list.size() && noneMatch(list.get(i + 1), PART_PATTERN, CHAPTER_PATTERN, SECTION_PATTERN, ARTICLE_PATTERN));
+                if (hasMore) {
+                    if (text.startsWith("　　")) {
+                        text = text.substring(2);
+                    }
+                    // 说明还有具体的小条例或者更多信息
+                    StringBuilder stringBuilder = new StringBuilder(text);
+                    int tempIndex = i + 1;
+                    String tempText = list.get(tempIndex);
+                    // 继续读取小条例或者更多信息
+                    while (tempIndex < list.size() && noneMatch(tempText, PART_PATTERN, CHAPTER_PATTERN, SECTION_PATTERN, ARTICLE_PATTERN)) {
+                        if (tempText.startsWith("　　")) {
+                            tempText = tempText.substring(2);
+                        }
+                        stringBuilder.append("\n");
+                        stringBuilder.append(tempText);
+                        tempIndex++;
+                        if (tempIndex < list.size()) {
+                            tempText = list.get(tempIndex);
+                        } else {
+                            break;
+                        }
+                    }
+                    i = tempIndex - 1;
+                    lawDetailResponseDTO.setContent(stringBuilder.toString());
+                }
+                lawDetailResponseDTO.setContentType(EnumLawContentType.ARTICLE);
+                lawDetailResponseDTO.setPart(part);
+                lawDetailResponseDTO.setChapter(chapter);
+                lawDetailResponseDTO.setSection(section);
+                lawDetailResponseDTO.setArticle(article);
+            } else if (ReUtil.isMatch(FOREWORD_REGEX, text)) {
+                // 序言
+                lawDetailResponseDTO.setContentType(EnumLawContentType.FOREWORD);
+                StringBuilder stringBuilder = new StringBuilder(text).append("\n");
+                int tempIndex = i + 1;
+                String tempText = list.get(tempIndex);
+                // 序言下一行为空 但是不确定是否只空一行 这里用while循环匹配到第一行非空序言
+                while (HzStringUtils.isBlank(tempText)) {
+                    tempIndex++;
+                    tempText = list.get(tempIndex);
+                }
+                // 到了这里肯定是非空序言开头
+                while (true) {
+                    if (tempText.startsWith("　　")) {
+                        tempText = tempText.substring(2);
+                    }
+                    stringBuilder.append(tempText);
+                    tempIndex++;
+                    tempText = list.get(tempIndex);
+                    if (HzStringUtils.isBlank(tempText)) {
+                        // 最后一行序言结束 下一行为空行 说明序言结束
+                        break;
+                    }
+                    stringBuilder.append("\n");
+                }
+                i = tempIndex - 1;
+                lawDetailResponseDTO.setContent(stringBuilder.toString());
+            } else {
+                if (text.contains("\u000B")) {
+                    text = text.replace("\u000B", "");
+                }
+                lawDetailResponseDTO.setContent(text);
+                lawDetailResponseDTO.setContentType(EnumLawContentType.OTHER);
+                result.add(lawDetailResponseDTO);
+                continue;
+            }
+            if (lawDetailResponseDTO.getContent() == null) {
+                if (text.startsWith("　　")) {
+                    text = text.substring(2);
+                }
+                lawDetailResponseDTO.setContent(text);
+            }
+            result.add(lawDetailResponseDTO);
+        }
+        return result;
+    }
+
+    private static List<LawDetailResponseDTO> readFromDocxWithoutPatternV2(Document document) {
+        List<LawDetailResponseDTO> result = new ArrayList<>();
+        String allText = document.getText();
+        List<String> list = StrSplitter.split(allText, "\n", true, false);
+        for (String text : list) {
+            if (HzStringUtils.equals("Evaluation Warning: The document was created with Spire.Doc for JAVA.", text)) {
+                continue;
+            }
+            LawDetailResponseDTO responseDTO = new LawDetailResponseDTO();
+            responseDTO.setContentType(EnumLawContentType.OTHER);
+            responseDTO.setContent(text);
+            result.add(responseDTO);
+        }
+        return result;
+    }
+
+    private static final Pattern EFFECTIVE_PATTERN = Pattern.compile("(\\d{4}年\\d{1,2}月\\d{1,2}日).{0,4}(起施行|起实施)");
+
+    private static final Pattern PUBLISH_PATTERN = Pattern.compile("(\\d{4}年\\d{1,2}月\\d{1,2}日).*(发布|公布)");
+
+//    @SneakyThrows
+//    public static void main(String[] args) {
+//        org.jsoup.nodes.Document doc = Jsoup.parse(URLUtil.url("https://www.hangzhou.gov.cn/art/2003/10/10/art_1229063379_1720978.html"), 5000);
+//        String html = doc.getElementsByClass("article").get(0).html();
+//        Document document = new Document(new ByteArrayInputStream(html.getBytes()), FileFormat.Html);
+//        TextSelection textSelection = document.findPattern(EFFECTIVE_PATTERN);
+//        if (textSelection != null && textSelection.getCount() > 0) {
+//            String text = textSelection.getAsOneRange().getText();
+//            System.out.println(text);
+//        }
+//    }
+
+    @SneakyThrows
+    public static void articleSmart() {
+        ArticleSmartMapperWrapper mapper = HzSpringUtils.getBean(ArticleSmartMapperWrapper.class);
+        List<ArticleSmartDO> all = mapper.findAll();
+        for (ArticleSmartDO articleSmartDO : all) {
+            if ("杭州市人民政府门户网站-地方性法规".equals(articleSmartDO.getSource()) && LawQuery.query().where.title().eq(articleSmartDO.getTitle()).end().to().count() > 0) {
+                System.out.println(articleSmartDO.getTitle() + "：已存在跳过");
+                continue;
+            }
             LawDO lawDO = new LawDO();
             lawDO.setOuterId("random_" + RandomUtil.randomString(20));
-            lawDO.setTitle(file.getName().replace(".docx", ""));
-            lawDO.setType(EnumLawType.LOCAL_REGULATIONS);
-            lawDO.setStatus(EnumLawStatus.EFFECTIVE);
-            lawDO.setSubject("");
-            lawDO.setDataSource(EnumLawSource.MEASURES_FOR_THE_ESTABLISHMENT_OF_LOCAL_REGULATIONS_IN_HANGZHOU);
-//            lawDO.setDocFileUrl();
-//            lawDO.setPdfFileUrl();
-            HzSpringUtils.getBean(ILawService.class).save(lawDO);
-            Document document = new Document(file.getAbsolutePath(), FileFormat.Docx);
-            List<LawDetailResponseDTO> list;
-            if (file.getName().startsWith("杭州市人大常委会建立立法基层联系点办法")) {
-                list = readFromDocxWithoutPattern(document);
+            lawDO.setTitle(articleSmartDO.getTitle().replace("\u200b", ""));
+            lawDO.setOriginalUrl(articleSmartDO.getOriginal());
+            org.jsoup.nodes.Document doc = Jsoup.parse(URLUtil.url(articleSmartDO.getOriginal()), 5000);
+            Document document;
+            if ("杭州市人民政府门户网站-地方性法规".equals(articleSmartDO.getSource())) {
+                String publish = doc.getElementsByClass("xxgkinfo").get(0).getAllElements().get(11).text();
+                lawDO.setPublish(DateUtil.parse(publish).toString(DatePattern.NORM_DATETIME_PATTERN));
+                String html = doc.getElementsByClass("article").get(0).html();
+                document = new Document(new ByteArrayInputStream(html.getBytes()), FileFormat.Html);
+                TextSelection effectiveTextSelection = document.findPattern(EFFECTIVE_PATTERN);
+                if (effectiveTextSelection != null && effectiveTextSelection.getCount() > 0) {
+                    String text = effectiveTextSelection.getAsOneRange().getText();
+                    String effective = ReUtil.getGroup1(EFFECTIVE_PATTERN, text);
+                    lawDO.setEffective(DateUtil.parse(effective).toString(DatePattern.NORM_DATETIME_PATTERN));
+                } else {
+                    lawDO.setEffective(lawDO.getPublish());
+                }
+                lawDO.setType(EnumLawType.LOCAL_REGULATIONS);
+                lawDO.setDataSource(EnumLawSource.HANGZHOU_MUNICIPAL_PEOPLE_GOVERNMENT_PORTAL_WEBSITE_LOCAL_REGULATIONS);
+                lawDO.setSubject("杭州市人民代表大会常务委员会");
+                // 时效性
+                String status = doc.getElementsByClass("xxgkinfo").get(0).getAllElements().get(14).text();
+                EnumLawStatus lawStatus = HzEnumUtils.fromDesc(EnumLawStatus.class, status);
+                if (lawStatus == null) {
+                    if ("失效".equals(status) || "废止".equals(status)) {
+                        lawStatus = EnumLawStatus.REPEALED;
+                    } else {
+                        throw new IllegalArgumentException("未知时效性：" + status);
+                    }
+                }
+                lawDO.setStatus(lawStatus);
             } else {
-                list = readFromDocxWithArticlePattern(document);
+                String html = doc.getElementsByClass("zc_article_con").get(0).html();
+                document = new Document(new ByteArrayInputStream(html.getBytes()), FileFormat.Html);
+                TextSelection effectiveTextSelection = document.findPattern(EFFECTIVE_PATTERN);
+                if (effectiveTextSelection != null && effectiveTextSelection.getCount() > 0) {
+                    String text = effectiveTextSelection.getAsOneRange().getText();
+                    String effective = ReUtil.getGroup1(EFFECTIVE_PATTERN, text);
+                    lawDO.setEffective(DateUtil.parse(effective).toString(DatePattern.NORM_DATETIME_PATTERN));
+                }
+                lawDO.setType(EnumLawType.NONE);
+                lawDO.setDataSource(EnumLawSource.HANGZHOU_MUNICIPAL_PEOPLE_GOVERNMENT_PORTAL_GOVERNMENT_REGULATIONS_DATABASE);
+                lawDO.setSubject("杭州市人民政府");
+                TextSelection publishTextSelection = document.findPattern(PUBLISH_PATTERN);
+                if (publishTextSelection != null && publishTextSelection.getCount() > 0) {
+                    String text = publishTextSelection.getAsOneRange().getText();
+                    String publish = ReUtil.getGroup1(PUBLISH_PATTERN, text);
+                    lawDO.setPublish(DateUtil.parse(publish).toString(DatePattern.NORM_DATETIME_PATTERN));
+                }
+                lawDO.setStatus(EnumLawStatus.EFFECTIVE);
+                String[] fileUrls = articleSmartDO.getFileList().split(",");
+                String docxFileUrl = "/fstore/" + HzFileUtils.getName(HttpUtil.decodeParamMap(fileUrls[0], StandardCharsets.UTF_8).get("filename"));
+                String pdfFileUrl = "/fstore/" + HzFileUtils.getName(HttpUtil.decodeParamMap(fileUrls[1], StandardCharsets.UTF_8).get("filename"));
+                FileUtil.writeBytes(HttpUtil.downloadBytes(fileUrls[0]), docxFileUrl);
+                FileUtil.writeBytes(HttpUtil.downloadBytes(fileUrls[1]), pdfFileUrl);
+                lawDO.setDocFileUrl(docxFileUrl);
+                lawDO.setPdfFileUrl(pdfFileUrl);
+            }
+
+            HzSpringUtils.getBean(ILawService.class).save(lawDO);
+            List<LawDetailResponseDTO> list;
+            if (document.findPattern(ARTICLE_PATTERN) != null) {
+                list = readFromDocxWithArticlePatternV2(document);
+            } else {
+                list = readFromDocxWithoutPatternV2(document);
             }
             List<LawContentDO> lawContentList = list.stream().map(responseDTO -> {
                 LawContentDO contentDO = new LawContentDO();
@@ -714,6 +1094,8 @@ public class LawDataUtils {
                 contentDO.setStatus(lawDO.getStatus());
                 contentDO.setTitle(lawDO.getTitle());
                 contentDO.setSubject(lawDO.getSubject());
+                contentDO.setEffective(lawDO.getEffective());
+                contentDO.setPublish(lawDO.getPublish());
                 contentDO.setPart(responseDTO.getPart());
                 contentDO.setChapter(responseDTO.getChapter());
                 contentDO.setSection(responseDTO.getSection());
@@ -721,9 +1103,109 @@ public class LawDataUtils {
                 contentDO.setContentType(responseDTO.getContentType());
                 contentDO.setContent(responseDTO.getContent());
                 contentDO.setDataSource(lawDO.getDataSource());
+                contentDO.setDocFileUrl(lawDO.getDocFileUrl());
+                contentDO.setPdfFileUrl(lawDO.getPdfFileUrl());
                 return contentDO;
             }).collect(Collectors.toList());
             HzSpringUtils.getBean(ILawContentService.class).insertBatch(lawContentList);
         }
     }
+
+    @SneakyThrows
+    public static void main(String[] args) {
+//        String string = FileUtil.readUtf8String(FileUtil.touch("D:\\fstore\\aaa.ofd"));
+//        System.out.println(string);
+//        Document document = new Document(Files.newInputStream(FileUtil.touch("D:\\fstore\\aaa.ofd").toPath()), FileFormat.Auto);
+//        document.saveToFile("D:\\fstore\\bbb.docx", FileFormat.Docx);
+
+//        XWPFDocument docx = new XWPFDocument(FileUtil.getInputStream("C:\\Users\\PC_Admin\\Downloads\\c7e15807753448a58309da8ec127cebc.docx"));
+//        for (XWPFHeader header : docx.getHeaderList()) {
+//            header.clearHeaderFooter();
+//        }
+//        for (XWPFFooter footer : docx.getFooterList()) {
+//            footer.clearHeaderFooter();
+//        }
+//        for (XWPFParagraph paragraph : docx.getParagraphs()) {
+//
+//        }
+//        XWPFWordExtractor extractor = new XWPFWordExtractor(docx);
+//        String text = extractor.getText();
+//        System.out.println(text);
+
+//        System.out.println(HzIdUtils.nextSnowflakeId());
+//        System.out.println(HzIdUtils.nextSnowflakeIdYit());
+//        Document document = new Document("C:\\Users\\PC_Admin\\Downloads\\80e776e3302a4b9a89d06423bd9059fd.docx" , FileFormat.Docx);
+//        List<LawDetailResponseDTO> list = readFromDocxWithArticlePattern(document);
+//        String now = DateUtil.now();
+//        for (LawDetailResponseDTO responseDTO : list) {
+//            StringBuilder stringBuilder = new StringBuilder("INSERT INTO law_content VALUES(");
+//            stringBuilder.append(HzIdUtils.nextSnowflakeIdYit())
+//                    .append(",")
+//                    .append("'ZmY4MDgxODE5MDE0ZWMzZjAxOTA1ZGE0OTY4ZDUyYmY%3D',")
+//                    .append(5).append(",").append(1).append(",")
+//                    .append("'杭州老字号传承与发展条例',")
+//                    .append("'杭州市人民代表大会常务委员会',").append("'2024-07-01 00:00:00',").append("'2024-06-04 00:00:00',")
+//                    .append(ObjectUtil.toString(responseDTO.getPart())).append(",").append(ObjectUtil.toString(responseDTO.getChapter())).append(",")
+//                    .append(ObjectUtil.toString(responseDTO.getSection())).append(",").append(ObjectUtil.toString(responseDTO.getArticle())).append(",")
+//                    .append(responseDTO.getContentType().getValue()).append(",'").append(responseDTO.getContent()).append("',")
+//                    .append(0).append(",").append("'/fstore/80e776e3302a4b9a89d06423bd9059fd.docx',").append("null,'").append(now).append("',").append("'").append(now).append("');");
+//            System.out.println(stringBuilder);
+//        }
+//        System.out.println(JSONUtil.toJsonStr(list));
+
+        String json = FileUtil.readUtf8String("D:\\project\\fastgpt\\src\\main\\java\\com\\hztech\\fastgpt\\a.json");
+        List<String> ids = JSONUtil.parseArray(json).stream().map(item -> JSONUtil.parseObj(item).getStr("id")).collect(Collectors.toList());
+        String join = "(\"" + CollUtil.join(ids, "\",\"") + "\")";
+        System.out.println(join);
+    }
+
+    public static void rebuildLawContent() {
+        LawMapperWrapper lawMapperWrapper = HzSpringUtils.getBean(LawMapperWrapper.class);
+        List<LawDO> all = lawMapperWrapper.findAll();
+        LawContentBakMapperWrapper lawContentBakMapperWrapper = HzSpringUtils.getBean(LawContentBakMapperWrapper.class);
+        LawContentBakQuery lawContentBakQuery = lawContentBakMapperWrapper.query().select.outerId().end().groupBy.outerId().end();
+        List<String> outerIds = lawContentBakMapperWrapper.findFieldListByQuery(lawContentBakQuery);
+        for (LawDO law : all) {
+            if (outerIds.contains(law.getOuterId())) {
+                continue;
+            }
+            if (law.getDataSource() == EnumLawSource.NATIONAL_LAWS_AND_REGULATIONS_DATABASE) {
+                // 重新构建内容
+                String docFileUrl = law.getDocFileUrl();
+                FileFormat fileFormat = docFileUrl.endsWith(".docx") ? FileFormat.Docx : docFileUrl.endsWith(".doc") ? FileFormat.Auto : FileFormat.Html;
+                log.info("url:{}", docFileUrl);
+                ByteArrayInputStream inputStream = new ByteArrayInputStream(HttpUtil.downloadBytes("http://192.168.1.13:8080" + docFileUrl));
+                Document document = new Document(inputStream, fileFormat);
+                List<LawDetailResponseDTO> list = readFromDocx(document);
+                List<LawContentBakDO> lawContentDOList = list.stream().map(responseDTO -> {
+                    LawContentBakDO contentDO = new LawContentBakDO();
+                    contentDO.setOuterId(law.getOuterId());
+                    contentDO.setType(law.getType());
+                    contentDO.setStatus(law.getStatus());
+                    contentDO.setTitle(law.getTitle());
+                    contentDO.setSubject(law.getSubject());
+                    contentDO.setEffective(law.getEffective());
+                    contentDO.setPublish(law.getPublish());
+                    contentDO.setPart(responseDTO.getPart());
+                    contentDO.setChapter(responseDTO.getChapter());
+                    contentDO.setSection(responseDTO.getSection());
+                    contentDO.setArticle(responseDTO.getArticle());
+                    contentDO.setContentType(responseDTO.getContentType());
+                    contentDO.setContent(responseDTO.getContent());
+                    contentDO.setDataSource(law.getDataSource());
+                    contentDO.setDocFileUrl(law.getDocFileUrl());
+                    contentDO.setPdfFileUrl(law.getPdfFileUrl());
+                    return contentDO;
+                }).collect(Collectors.toList());
+                lawContentBakMapperWrapper.insertBatch(lawContentDOList);
+            } else {
+                LawContentMapperWrapper lawContentMapperWrapper = HzSpringUtils.getBean(LawContentMapperWrapper.class);
+                LawContentQuery lawContentQuery = lawContentMapperWrapper.query().where.outerId().eq(law.getOuterId()).end();
+                List<LawContentDO> list = lawContentMapperWrapper.findListByQuery(lawContentQuery);
+                List<LawContentBakDO> lawContentBakDOS = BeanUtil.copyToList(list, LawContentBakDO.class, CopyOptions.create().setIgnoreProperties("id"));
+                lawContentBakMapperWrapper.insertBatch(lawContentBakDOS);
+            }
+        }
+    }
+
 }

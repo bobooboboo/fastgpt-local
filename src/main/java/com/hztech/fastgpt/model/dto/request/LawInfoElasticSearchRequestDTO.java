@@ -31,6 +31,14 @@ public class LawInfoElasticSearchRequestDTO {
 
     private Highlight highlight;
 
+    public LawInfoElasticSearchRequestDTO() {
+        this.query = new Query();
+        query.bool = new Bool();
+        query.bool.must = new ArrayList<>();
+        query.bool.should = new ArrayList<>();
+        this.sort = new ArrayList<>();
+    }
+
     public LawInfoElasticSearchRequestDTO(Long from, Long size) {
         this.query = new Query();
         query.bool = new Bool();
@@ -47,7 +55,7 @@ public class LawInfoElasticSearchRequestDTO {
 
         protected JSONObject build() {
             JSONObject jsonObject = new JSONObject();
-            jsonObject.set("bool", bool.build());
+            jsonObject.set("bool" , bool.build());
             return jsonObject;
         }
     }
@@ -60,10 +68,10 @@ public class LawInfoElasticSearchRequestDTO {
 
         protected JSONObject build() {
             JSONObject jsonObject = new JSONObject();
-            jsonObject.set("must", must.stream().map(Must::build).collect(Collectors.toList()));
+            jsonObject.set("must" , must.stream().map(Must::build).collect(Collectors.toList()));
             if (HzCollectionUtils.isNotEmpty(should)) {
-                jsonObject.set("should", should.stream().map(Should::build).collect(Collectors.toList()));
-                jsonObject.set("minimum_should_match", "1");
+                jsonObject.set("should" , should.stream().map(Should::build).collect(Collectors.toList()));
+                jsonObject.set("minimum_should_match" , "1");
             }
             return jsonObject;
         }
@@ -130,7 +138,7 @@ public class LawInfoElasticSearchRequestDTO {
     public void sort(String field, String operation) {
         Map<String, Map<String, String>> map = new HashMap<>(4);
         Map<String, String> innerMap = new HashMap<>(4);
-        innerMap.put("order", operation);
+        innerMap.put("order" , operation);
         map.put(field, innerMap);
         this.sort.add(new Sort(map));
     }
@@ -148,8 +156,8 @@ public class LawInfoElasticSearchRequestDTO {
         this.highlight = new Highlight();
         highlight.fields = new JSONObject();
         JSONObject jsonObject = new JSONObject();
-        jsonObject.set("type", "plain");
-        highlight.fields.set("content", jsonObject);
+        jsonObject.set("type" , "plain");
+        highlight.fields.set("content" , jsonObject);
     }
 
     public void enableHighlight(String preTags, String postTags) {
@@ -158,8 +166,8 @@ public class LawInfoElasticSearchRequestDTO {
         highlight.post_tags = HzCollectionUtils.newArrayList(postTags);
         highlight.fields = new JSONObject();
         JSONObject jsonObject = new JSONObject();
-        jsonObject.set("type", "plain");
-        highlight.fields.set("content", jsonObject);
+        jsonObject.set("type" , "plain");
+        highlight.fields.set("content" , jsonObject);
     }
 
     private final JSONObject aggs = JSONUtil.parseObj("{\"lawInfoCount\":{\"cardinality\":{\"field\":\"outerId\"}}}");
@@ -169,14 +177,20 @@ public class LawInfoElasticSearchRequestDTO {
     @Override
     public String toString() {
         JSONObject jsonObject = new JSONObject();
-        jsonObject.set("query", query.build());
-        jsonObject.set("sort", sort.stream().map(Sort::getMap).collect(Collectors.toList()));
-        jsonObject.set("from", from);
-        jsonObject.set("size", size);
-        jsonObject.set("aggs", aggs);
-        jsonObject.set("collapse", collapse);
+        jsonObject.set("query" , query.build());
+        if (HzCollectionUtils.isNotEmpty(sort)) {
+            jsonObject.set("sort" , sort.stream().map(Sort::getMap).collect(Collectors.toList()));
+        }
+        if (from != null) {
+            jsonObject.set("from" , from);
+        }
+        if (size != null) {
+            jsonObject.set("size" , size);
+        }
+        jsonObject.set("aggs" , aggs);
+        jsonObject.set("collapse" , collapse);
         if (highlight != null) {
-            jsonObject.set("highlight", highlight);
+            jsonObject.set("highlight" , highlight);
         }
         return jsonObject.toString();
     }

@@ -31,7 +31,22 @@ public enum EnumLawSource implements IIntegerEnum {
     /**
      * 杭州市地方性法规立项办法
      */
-    MEASURES_FOR_THE_ESTABLISHMENT_OF_LOCAL_REGULATIONS_IN_HANGZHOU(2, "杭州市地方性法规立项办法");
+    MEASURES_FOR_THE_ESTABLISHMENT_OF_LOCAL_REGULATIONS_IN_HANGZHOU(2, "杭州市地方性法规立项办法"),
+
+    /**
+     * 国务院政策文件库
+     */
+    STATE_COUNCIL_POLICY_DOCUMENT_LIBRARY(3, "国务院政策文件库"),
+
+    /**
+     * 杭州市人民政府门户网站-地方性法规
+     */
+    HANGZHOU_MUNICIPAL_PEOPLE_GOVERNMENT_PORTAL_WEBSITE_LOCAL_REGULATIONS(4, "杭州市人民政府门户网站-地方性法规"),
+
+    /**
+     * 杭州市人民政府门户网站-政府规章库
+     */
+    HANGZHOU_MUNICIPAL_PEOPLE_GOVERNMENT_PORTAL_GOVERNMENT_REGULATIONS_DATABASE(5, "杭州市人民政府门户网站-政府规章库");
 
     /**
      * 枚举值
