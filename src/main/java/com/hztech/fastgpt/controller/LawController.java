@@ -135,7 +135,7 @@ public class LawController {
 
     @ApiOperation("法律法规统计")
     @PostMapping("/api/v2/law/statistics")
-    public HzResponse<String> lawStatisticsV2(@RequestBody LawStatisticsRequestDTO requestDTO) {
+    public HzResponse<LawStatisticsResponseDTO> lawStatisticsV2(@RequestBody LawStatisticsRequestDTO requestDTO) {
         return HzResponse.success(lawService.lawStatisticsV2(requestDTO));
     }
 
@@ -172,6 +172,12 @@ public class LawController {
         return HzResponse.success();
     }
 
+//    @GetMapping("/api/v1/initPreviewUrl")
+//    public HzResponse<Void> initPreviewUrl() {
+//        lawService.initPreviewUrl();
+//        return HzResponse.success();
+//    }
+
     //    @PostMapping("/api/v1/initHigherLevelLaw")
 //    public HzResponse<Void> initHigherLevelLaw() {
 //        higherLevelLawService.initHigherLevelLaw();
@@ -183,5 +189,15 @@ public class LawController {
 //        LawDataUtils.temp1();
 //        LawDataUtils.temp2();
 //        return HzResponse.success();
+//    }
+
+//    @GetMapping("/api/v1/test")
+//    public HzResponse<String> test() {
+//        LawContentMapperWrapper mapper = HzSpringUtils.getBean(LawContentMapperWrapper.class);
+//        LawContentQuery query = LawContentQuery.query().where.outerId().eq("NDAyOGFiY2M2MTI3Nzc5MzAxNjEyN2Y3NDVjMTM3YzM%3D").end();
+//        ClientInterface restClient = bossESStarter.getRestClient();
+//        List<LawInfo> list = mapper.findListByQuery(query, LawInfo.class);
+//        String result = restClient.addDocuments("law_info", list);
+//        return HzResponse.success(result);
 //    }
 }

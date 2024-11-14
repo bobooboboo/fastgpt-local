@@ -29,7 +29,8 @@ public class LawContentServiceImpl extends HzBaseTransactionScriptService<ILawCo
     @Override
     public List<LawInfo> getAll(LocalDateTime dateTime, Long minId, Long maxId) {
         LawContentQuery query = LawContentQuery.query()
-                .select.id().outerId().type().status().title().subject().effective().publish().content().docFileUrl().pdfFileUrl().part().chapter().section().article().dataSource().end()
+                .select.id().outerId().type().status().title().subject().effective().publish().content()
+                .docFileUrl().pdfFileUrl().previewUrl().part().chapter().section().article().dataSource().end()
                 .where.createTime().gt(dateTime, If::notNull).id().le(maxId, If::notNull).id().ge(minId, If::notNull).end();
         return mapper.findListByQuery(query, LawInfo.class);
     }

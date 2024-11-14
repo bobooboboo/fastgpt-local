@@ -68,4 +68,10 @@ public class LawInfoSearchResponseDTO {
      */
     @ApiModelProperty("附件地址")
     private String pdfFileUrl;
+
+    /**
+     * 预览附件地址
+     */
+    @ApiModelProperty("预览附件地址")
+    private String previewUrl;
 }

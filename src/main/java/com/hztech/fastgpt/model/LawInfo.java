@@ -1,5 +1,6 @@
 package com.hztech.fastgpt.model;
 
+import cn.hutool.core.util.StrUtil;
 import com.frameworkset.orm.annotation.ESId;
 import com.frameworkset.orm.annotation.ESIndex;
 import com.frameworkset.orm.annotation.ESMetaHighlight;
@@ -79,6 +80,11 @@ public class LawInfo implements Serializable {
     private String pdfFileUrl;
 
     /**
+     * 预览附件地址
+     */
+    private String previewUrl;
+
+    /**
      * 第几编
      */
     private Integer part;
@@ -106,4 +112,11 @@ public class LawInfo implements Serializable {
     @ESMetaHighlight
     private Map<String, List<Object>> highlights;
 
+    public String getPublish() {
+        return StrUtil.emptyToNull(publish);
+    }
+
+    public String getEffective() {
+        return StrUtil.emptyToNull(effective);
+    }
 }

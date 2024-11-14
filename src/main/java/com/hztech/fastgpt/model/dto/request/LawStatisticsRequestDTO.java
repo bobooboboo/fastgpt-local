@@ -2,6 +2,7 @@ package com.hztech.fastgpt.model.dto.request;
 
 import cn.hutool.core.util.StrUtil;
 import com.hztech.fastgpt.model.enums.EnumLawStatus;
+import com.hztech.fastgpt.model.enums.EnumLawType;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
@@ -17,7 +18,7 @@ import java.util.List;
 public class LawStatisticsRequestDTO {
 
     @ApiModelProperty("法律性质")
-    private List<String> type;
+    private List<EnumLawType> type;
 
     @ApiModelProperty("时效性")
     private List<EnumLawStatus> status;

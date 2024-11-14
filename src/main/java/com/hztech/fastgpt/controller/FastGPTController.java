@@ -41,8 +41,8 @@ public class FastGPTController {
      * 创建文件集合
      *
      * @param datasetId 知识库id
-     * @param parentId 文件夹id
-     * @param file 文件
+     * @param parentId  文件夹id
+     * @param file      文件
      */
     @PostMapping("/api/v1/uploadFile")
     public HzResponse<Map<String, Object>> uploadFile(@RequestParam("datasetId") String datasetId,
@@ -55,8 +55,8 @@ public class FastGPTController {
      * 创建文件集合
      *
      * @param datasetId 知识库id
-     * @param parentId 文件夹id
-     * @param file 文件
+     * @param parentId  文件夹id
+     * @param file      文件
      */
     @PostMapping("/api/v1/createFileCollection")
     public HzResponse<List<String>> createFileCollection(@RequestParam("datasetId") String datasetId,
@@ -88,7 +88,7 @@ public class FastGPTController {
     /**
      * 查询应用列表
      *
-     * @param parentId 文件夹id
+     * @param parentId  文件夹id
      * @param searchKey 搜索关键字
      */
     @GetMapping("/api/v1/app/list")

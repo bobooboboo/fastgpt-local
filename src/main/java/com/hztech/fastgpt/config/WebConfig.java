@@ -6,9 +6,11 @@ import com.fasterxml.jackson.datatype.jsr310.deser.LocalTimeDeserializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalTimeSerializer;
+import com.hztech.model.properties.FluentMybatisProperties;
 import com.hztech.util.HzDateUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -26,6 +28,7 @@ import java.util.TimeZone;
  **/
 @Configuration
 @RequiredArgsConstructor
+@EnableConfigurationProperties({FluentMybatisProperties.class})
 public class WebConfig implements WebMvcConfigurer {
 
     @Bean
@@ -65,7 +68,7 @@ public class WebConfig implements WebMvcConfigurer {
      */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/fstore/**")
-                .addResourceLocations("file:/fstore/");
+        registry.addResourceHandler("/fstore/**", "/fstore/preview/**")
+                .addResourceLocations("file:/fstore/", "file:/fstore/preview/");
     }
 }

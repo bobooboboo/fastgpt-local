@@ -65,6 +65,9 @@
                     },
                     "pdfFileUrl": {
                         "type": "keyword"
+                    },
+                    "previewUrl": {
+                        "type": "keyword"
                     }
                 }
             }

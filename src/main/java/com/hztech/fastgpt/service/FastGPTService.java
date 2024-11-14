@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static com.hztech.fastgpt.constant.ApiConstants.PATH_CHAT_COMPLETIONS;
@@ -134,10 +135,10 @@ public class FastGPTService {
     /**
      * 流式对话
      *
-     * @param chatId       为 undefined 时（不传入），不使用 FastGpt 提供的上下文功能，完全通过传入的 messages 构建上下文。 不会将你的记录存储到数据库中，你也无法在记录汇总中查阅到。
-     *                     为非空字符串时，意味着使用 chatId 进行对话，自动从 FastGpt 数据库取历史记录，并使用 messages 数组最后一个内容作为用户问题。请自行确保 chatId 唯一，长度小于250，通常可以是自己系统的对话框ID。
-     * @param variables    模块变量，一个对象，会替换模块中，输入框内容里的{{key}}
-     * @param messages     结构与 GPT接口 chat模式一致。
+     * @param chatId    为 undefined 时（不传入），不使用 FastGpt 提供的上下文功能，完全通过传入的 messages 构建上下文。 不会将你的记录存储到数据库中，你也无法在记录汇总中查阅到。
+     *                  为非空字符串时，意味着使用 chatId 进行对话，自动从 FastGpt 数据库取历史记录，并使用 messages 数组最后一个内容作为用户问题。请自行确保 chatId 唯一，长度小于250，通常可以是自己系统的对话框ID。
+     * @param variables 模块变量，一个对象，会替换模块中，输入框内容里的{{key}}
+     * @param messages  结构与 GPT接口 chat模式一致。
      */
     public SseEmitter chatCompletionsStream(String chatId, Map<String, String> variables,
                                             List<ChatMessage> messages) {
@@ -163,7 +164,7 @@ public class FastGPTService {
     /**
      * 发送sse请求
      *
-     * @param path 请求路径
+     * @param path  请求路径
      * @param param 请求参数
      */
     private SseEmitter postSseRequest(String path, JSONObject param) {
@@ -172,6 +173,7 @@ public class FastGPTService {
             String chatKey = MDC.get("chatKey");
             String chatId = param.getStr("chatId");
             Mono.fromCallable(() -> {
+                        AtomicBoolean firstBlankLine = new AtomicBoolean(false);
                         WebClient.create(combPath(path))
                                 .post()
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -182,39 +184,43 @@ public class FastGPTService {
                                 .bodyToFlux(String.class)
                                 .doOnNext(data -> {
                                     try {
-                                        if (HzStringUtils.equals("[DONE]", data)) {
-                                            emitter.send(data);
+                                        if (!firstBlankLine.get() && !HzStringUtils.equals("[DONE]", data) && JSONUtil.isTypeJSON(data) && HzStringUtils.equals(JSONUtil.getByPath(JSONUtil.parseObj(data), "choices[0].delta.content", ""), "\n")) {
+                                            firstBlankLine.set(true);
                                         } else {
-                                            JSONObject jsonObject = JSONUtil.parseObj(data);
-                                            if (HzStringUtils.isNotBlank(data)) {
-                                                if (HzStringUtils.isNotBlank(chatId) && CACHE.containsKey(chatId) && JSONUtil.isTypeJSON(data)) {
-                                                    SaveSceneDataRequestDTO requestDTO = CACHE.get(chatId);
-                                                    jsonObject = JSONUtil.parseObj(data);
-                                                    if (ObjectUtil.isNotEmpty(requestDTO.getData())) {
-                                                        jsonObject.putOpt("data", requestDTO.getData());
-                                                    }
-                                                    if (HzStringUtils.isNotBlank(requestDTO.getCode())) {
-                                                        jsonObject.putOpt("code", requestDTO.getCode());
-                                                    }
-                                                    if (ObjectUtil.isNotEmpty(requestDTO.getUserSelectData())) {
-                                                        jsonObject.putOpt("userSelectData", requestDTO.getUserSelectData());
+                                            if (HzStringUtils.equals("[DONE]", data)) {
+                                                emitter.send(data);
+                                            } else {
+                                                JSONObject jsonObject = JSONUtil.parseObj(data);
+                                                if (HzStringUtils.isNotBlank(data)) {
+                                                    if (HzStringUtils.isNotBlank(chatId) && CACHE.containsKey(chatId) && JSONUtil.isTypeJSON(data)) {
+                                                        SaveSceneDataRequestDTO requestDTO = CACHE.get(chatId);
+                                                        jsonObject = JSONUtil.parseObj(data);
+                                                        if (ObjectUtil.isNotEmpty(requestDTO.getData())) {
+                                                            jsonObject.putOpt("data", requestDTO.getData());
+                                                        }
+                                                        if (HzStringUtils.isNotBlank(requestDTO.getCode())) {
+                                                            jsonObject.putOpt("code", requestDTO.getCode());
+                                                        }
+                                                        if (ObjectUtil.isNotEmpty(requestDTO.getUserSelectData())) {
+                                                            jsonObject.putOpt("userSelectData", requestDTO.getUserSelectData());
+                                                        }
                                                     }
                                                 }
-                                            }
-                                            JSONObject delta = jsonObject.getByPath("choices[0].delta", JSONObject.class);
-                                            if (delta == null || delta.isEmpty()) {
-                                                emitter.send(jsonObject.toString());
-                                            } else {
-                                                String content = delta.getStr("content");
-                                                if (HzStringUtils.isNotBlank(content) && content.length() > 5) {
-                                                    // 处理指定回复一次性返回太多文本
-                                                    for (int i = 0; i < content.length(); i += 2) {
-                                                        jsonObject.putByPath("choices[0].delta.content", StrUtil.sub(content, i, NumberUtil.min(i + 2, content.length())));
-                                                        emitter.send(jsonObject.toString());
-                                                        ThreadUtil.safeSleep(10);
-                                                    }
-                                                } else {
+                                                JSONObject delta = jsonObject.getByPath("choices[0].delta", JSONObject.class);
+                                                if (delta == null || delta.isEmpty()) {
                                                     emitter.send(jsonObject.toString());
+                                                } else {
+                                                    String content = delta.getStr("content");
+                                                    if (HzStringUtils.isNotBlank(content) && content.length() > 5) {
+                                                        // 处理指定回复一次性返回太多文本
+                                                        for (int i = 0; i < content.length(); i += 2) {
+                                                            jsonObject.putByPath("choices[0].delta.content", StrUtil.sub(content, i, NumberUtil.min(i + 2, content.length())));
+                                                            emitter.send(jsonObject.toString());
+                                                            ThreadUtil.safeSleep(5);
+                                                        }
+                                                    } else {
+                                                        emitter.send(jsonObject.toString());
+                                                    }
                                                 }
                                             }
                                         }

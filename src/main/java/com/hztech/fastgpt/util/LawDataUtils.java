@@ -239,7 +239,7 @@ public class LawDataUtils {
                         lawElasticSearchDO.setDataSource(EnumLawSource.NATIONAL_LAWS_AND_REGULATIONS_DATABASE);
                         return lawElasticSearchDO;
                     }).collect(Collectors.toList());
-                    HzSpringUtils.getBean(ILawContentService.class).insertBatch(list);
+//                    HzSpringUtils.getBean(ILawContentService.class).insertBatch(list);
                 }
             }
         }
@@ -1107,7 +1107,7 @@ public class LawDataUtils {
                 contentDO.setPdfFileUrl(lawDO.getPdfFileUrl());
                 return contentDO;
             }).collect(Collectors.toList());
-            HzSpringUtils.getBean(ILawContentService.class).insertBatch(lawContentList);
+            HzSpringUtils.getBean(LawContentMapperWrapper.class).insertBatch(lawContentList);
         }
     }
 

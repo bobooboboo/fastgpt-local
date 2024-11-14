@@ -121,9 +121,19 @@ public class LawDO extends BaseEntity implements Serializable,
     @Length(max = 255)
     private String pdfFileUrl;
 
+    /**
+     * 网页源地址
+     */
     @TableField("original_url")
     @Length(max = 255)
     private String originalUrl;
+
+    /**
+     * 预览附件地址
+     */
+    @TableField("preview_url")
+    @Length(max = 255)
+    private String previewUrl;
 
     /**
      * 创建时间

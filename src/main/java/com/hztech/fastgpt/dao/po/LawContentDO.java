@@ -162,6 +162,13 @@ public class LawContentDO extends BaseEntity implements Serializable,
     private String pdfFileUrl;
 
     /**
+     * 预览附件地址
+     */
+    @TableField("preview_url")
+    @Length(max = 255)
+    private String previewUrl;
+
+    /**
      * 创建时间
      */
     @TableField("create_time")

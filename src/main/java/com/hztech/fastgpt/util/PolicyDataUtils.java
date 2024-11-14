@@ -9,6 +9,7 @@ import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONUtil;
 import com.hztech.fastgpt.dao.po.LawContentDO;
 import com.hztech.fastgpt.dao.po.LawDO;
+import com.hztech.fastgpt.mapper.wrapper.LawContentMapperWrapper;
 import com.hztech.fastgpt.model.dto.response.LawDetailResponseDTO;
 import com.hztech.fastgpt.model.enums.EnumLawSource;
 import com.hztech.fastgpt.model.enums.EnumLawStatus;
@@ -154,7 +155,7 @@ public class PolicyDataUtils {
                             lawElasticSearchDO.setDataSource(EnumLawSource.STATE_COUNCIL_POLICY_DOCUMENT_LIBRARY);
                             return lawElasticSearchDO;
                         }).collect(Collectors.toList());
-                        HzSpringUtils.getBean(ILawContentService.class).insertBatch(lawContentList);
+                        HzSpringUtils.getBean(LawContentMapperWrapper.class).insertBatch(lawContentList);
                     }
                 }
             }

@@ -4,10 +4,12 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONConfig;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
@@ -19,7 +21,9 @@ import com.hztech.fastgpt.dao.ILawDao;
 import com.hztech.fastgpt.dao.po.LawContentDO;
 import com.hztech.fastgpt.dao.po.LawDO;
 import com.hztech.fastgpt.dao.wrapper.LawContentQuery;
+import com.hztech.fastgpt.dao.wrapper.LawContentUpdate;
 import com.hztech.fastgpt.dao.wrapper.LawQuery;
+import com.hztech.fastgpt.dao.wrapper.LawUpdate;
 import com.hztech.fastgpt.mapper.wrapper.LawContentMapperWrapper;
 import com.hztech.fastgpt.mapper.wrapper.LawMapperWrapper;
 import com.hztech.fastgpt.model.CommonConstants;
@@ -28,15 +32,24 @@ import com.hztech.fastgpt.model.dto.request.*;
 import com.hztech.fastgpt.model.dto.response.*;
 import com.hztech.fastgpt.model.enums.*;
 import com.hztech.fastgpt.service.ILawService;
+import com.hztech.model.SpireConfig;
 import com.hztech.model.dto.HzPage;
 import com.hztech.service.transactionscript.impl.HzBaseTransactionScriptService;
-import com.hztech.util.*;
+import com.hztech.util.HzCollectionUtils;
+import com.hztech.util.HzConvertUtils;
+import com.hztech.util.HzStreamUtils;
+import com.hztech.util.HzStringUtils;
+import com.spire.doc.Document;
+import com.spire.doc.FileFormat;
+import com.spire.doc.documents.XHTMLValidationType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.frameworkset.elasticsearch.boot.BBossESStarter;
 import org.frameworkset.elasticsearch.client.ClientInterface;
 import org.frameworkset.elasticsearch.entity.ESDatas;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -46,6 +59,7 @@ import java.util.stream.Collectors;
  *
  * @author HZ
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawDO, Long>
@@ -74,27 +88,29 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
     private static final List<EnumLawSource> LOCAL_REGULATIONS_LAW_SOURCE_LIST = HzCollectionUtils.newArrayList(EnumLawSource.NATIONAL_LAWS_AND_REGULATIONS_DATABASE,
             EnumLawSource.HANGZHOU_MUNICIPAL_PEOPLE_GOVERNMENT_PORTAL_WEBSITE_LOCAL_REGULATIONS);
 
+//    private final ThreadPoolExecutor threadPoolExecutor;
+
     @Override
     public HzPage<LawPageResponseDTO> lawPage(LawPageRequestDTO requestDTO) {
         LawQuery lawQuery = LawQuery.query().where.title().like(requestDTO.getTitle(), If::notBlank).end();
         return mapper.findPageByQuery(lawQuery, requestDTO, LawPageResponseDTO.class);
     }
 
-    @Override
-    public HzPage<TempLawPageResponseDTO> tempLawPage(LawPageRequestDTO requestDTO) {
-        HzPage<TempLawPageResponseDTO> page = new HzPage<>();
-        Map<String, Object> resultMap = serviceRequests.listCollection("66ed1eb7526336d2393c9d53", requestDTO.getCurrent().intValue(), requestDTO.getSize().intValue(), "", requestDTO.getTitle());
-        JSONObject jsonObject = JSONUtil.parseObj(resultMap).getJSONObject("data");
-        List<ListCollectionResponseDTO> data = jsonObject.getBeanList("data", ListCollectionResponseDTO.class);
-        page.setTotal(jsonObject.getLong("total", 0L));
-        page.setRows(data.stream().map(responseDTO -> {
-            TempLawPageResponseDTO tempLawPageResponseDTO = new TempLawPageResponseDTO();
-            tempLawPageResponseDTO.setTitle(StrUtil.subBefore(responseDTO.getName(), "_", true));
-            tempLawPageResponseDTO.setUrl("http://192.168.1.12:3000" + JSONUtil.parseObj(serviceRequests.readFile(responseDTO.get_id())).getByPath("data.value", String.class));
-            return tempLawPageResponseDTO;
-        }).collect(Collectors.toList()));
-        return page;
-    }
+//    @Override
+//    public HzPage<TempLawPageResponseDTO> tempLawPage(LawPageRequestDTO requestDTO) {
+//        HzPage<TempLawPageResponseDTO> page = new HzPage<>();
+//        Map<String, Object> resultMap = serviceRequests.listCollection("66ed1eb7526336d2393c9d53", requestDTO.getCurrent().intValue(), requestDTO.getSize().intValue(), "", requestDTO.getTitle());
+//        JSONObject jsonObject = JSONUtil.parseObj(resultMap).getJSONObject("data");
+//        List<ListCollectionResponseDTO> data = jsonObject.getBeanList("data", ListCollectionResponseDTO.class);
+//        page.setTotal(jsonObject.getLong("total", 0L));
+//        page.setRows(data.stream().map(responseDTO -> {
+//            TempLawPageResponseDTO tempLawPageResponseDTO = new TempLawPageResponseDTO();
+//            tempLawPageResponseDTO.setTitle(StrUtil.subBefore(responseDTO.getName(), "_", true));
+//            tempLawPageResponseDTO.setUrl("http://192.168.1.12:3000" + JSONUtil.parseObj(serviceRequests.readFile(responseDTO.get_id())).getByPath("data.value", String.class));
+//            return tempLawPageResponseDTO;
+//        }).collect(Collectors.toList()));
+//        return page;
+//    }
 
     @Override
     public boolean save(LawDO lawDO) {
@@ -107,13 +123,13 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
 
     @Override
     public HzPage<LawInfoSearchResponseDTO> search(LawInfoSearchRequestDTO requestDTO) {
-        if (HzStringUtils.isBlank(requestDTO.getText()) &&
-                ObjectUtil.isEmpty(requestDTO.getTextList()) &&
-                HzStringUtils.isBlank(requestDTO.getCity()) &&
-                HzCollectionUtils.isEmpty(requestDTO.getStatus()) &&
-                HzCollectionUtils.isEmpty(requestDTO.getType())) {
-            return HzPage.empty();
-        }
+//        if (HzStringUtils.isBlank(requestDTO.getText()) &&
+//                ObjectUtil.isEmpty(requestDTO.getTextList()) &&
+//                HzStringUtils.isBlank(requestDTO.getCity()) &&
+//                HzCollectionUtils.isEmpty(requestDTO.getStatus()) &&
+//                HzCollectionUtils.isEmpty(requestDTO.getType())) {
+//            return HzPage.empty();
+//        }
         ClientInterface restClient = bossESStarter.getRestClient();
         String body = buildElasticSearchRequestDTO(requestDTO).toString();
         ESDatas<LawInfo> esDatas = restClient.searchList("/law_info/_search", body, LawInfo.class);
@@ -154,11 +170,14 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
             if (BooleanUtil.isTrue(requestDTO.getFullContent())) {
                 dto.setContent(fullContentMap.get(responseDTO.getOuterId()));
             }
-            String fileUrl = StrUtil.blankToDefault(responseDTO.getPdfFileUrl(), responseDTO.getDocFileUrl());
+//            String fileUrl = StrUtil.blankToDefault(responseDTO.getPdfFileUrl(), responseDTO.getDocFileUrl());
+            // PDF预览
+            String fileUrl = StrUtil.blankToDefault(responseDTO.getPreviewUrl(), StrUtil.blankToDefault(responseDTO.getPdfFileUrl(), responseDTO.getDocFileUrl()));
             if (HzStringUtils.isNotBlank(fileUrl)) {
-//                dto.setFileUrl("http://192.168.1.13:8080" + fileUrl);
+                dto.setFileUrl("http://hztyjdaiservice.2dmeeting.cn:13808" + fileUrl);
 //                dto.setFileUrl("http://192.168.1.13:8080/api/v1/law/downloadFile?outerId=" + responseDTO.getOuterId());
-                dto.setFileUrl("https://hztyjdgateway.2dmeeting.cn:3150/chat/pb/c/v1/law/downloadFile?outerId=" + responseDTO.getOuterId());
+//                dto.setFileUrl("https://hztyjdgateway.2dmee/ting.cn:3150/chat/pb/c/v1/law/downloadFile?outerId=" + responseDTO.getOuterId());
+//                dto.setFileUrl("https://hztyjdgateway.2dmeeting.cn:3150/chat/pb/c/v1/law/downloadFile?outerId=" + responseDTO.getOuterId());
             }
             dto.setPublish(responseDTO.getPublish());
             dto.setSubject(responseDTO.getSubject());
@@ -169,20 +188,20 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
 
     @Override
     public Map<String, Long> lawStatistics(LawStatisticsRequestDTO requestDTO) {
-        List<EnumLawType> lawTypes = CollUtil.emptyIfNull(requestDTO.getType()).stream().map(desc -> HzEnumUtils.fromDesc(EnumLawType.class, desc)).collect(Collectors.toList());
         LawQuery lawQuery = mapper.query()
                 .select.type().status().title().end()
                 .where
-                .type().in(lawTypes, If::notEmpty)
+                .type().in(requestDTO.getType(), If::notEmpty)
 //                .type().in(CollUtil.defaultIfEmpty(lawTypes, defaultLawTypeList))
-                .status().in(requestDTO.getStatus(), If::notEmpty)
+//                .status().in(requestDTO.getStatus(), If::notEmpty)
                 .subject().like(requestDTO.getSubject(), If::notBlank)
                 .dataSource().in(LOCAL_REGULATIONS_LAW_SOURCE_LIST).end();
         if (requestDTO.getYear() != null && requestDTO.getYear() > 0) {
             DateTime beginOfYear = DateUtil.parseDateTime(requestDTO.getYear() + "-01-01 00:00:00");
             requestDTO.setPublishBegin(beginOfYear.toString());
             requestDTO.setPublishEnd(DateUtil.endOfYear(beginOfYear).toString());
-        } else if ((HzStringUtils.isNotBlank(requestDTO.getPublishBegin()) && !HzStringUtils.equals("null", requestDTO.getPublishBegin()))
+        }
+        if ((HzStringUtils.isNotBlank(requestDTO.getPublishBegin()) && !HzStringUtils.equals("null", requestDTO.getPublishBegin()))
                 || (HzStringUtils.isNotBlank(requestDTO.getPublishEnd()) && !HzStringUtils.equals("null", requestDTO.getPublishEnd()))) {
             if (HzStringUtils.isNotBlank(requestDTO.getPublishBegin())) {
                 DateTime publishBegin = DateUtil.parse(requestDTO.getPublishBegin());
@@ -212,17 +231,6 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
                 }
             }
         }
-//        for (EnumLawType enumLawType : defaultLawTypeList) {
-//            if (map.containsKey(enumLawType)) {
-//                result.put(enumLawType.getDesc(), map.get(enumLawType));
-//            } else {
-//                if (result.containsKey("相关文件")) {
-//                    result.put("相关文件", result.get("相关文件") + map.get(enumLawType));
-//                } else {
-//                    result.put("相关文件", map.get(enumLawType));
-//                }
-//            }
-//        }
         if (HzCollectionUtils.isNotEmpty(requestDTO.getStatus())) {
             Map<EnumLawStatus, Long> lawStatusMap = list.stream().collect(Collectors.groupingBy(LawDO::getStatus, Collectors.counting()));
             for (EnumLawStatus lawStatus : requestDTO.getStatus()) {
@@ -231,22 +239,6 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
         }
         return result;
     }
-
-//    @Override
-//    public ResponseEntity<StreamingResponseBody> downloadFile(String outerId) {
-//        LawQuery lawQuery = mapper.query().where.outerId().like(outerId).end();
-//        LawDO lawDO = mapper.findTopByQuery(lawQuery);
-//        if (lawDO != null) {
-//            OutputStream outputStream = new ByteArrayOutputStream();
-//            if (HzStringUtils.isNotBlank(lawDO.getPdfFileUrl()) && FileUtil.writeToStream(lawDO.getPdfFileUrl(), outputStream) > 0) {
-//                return HzFileResponse.file(outputStream, lawDO.getTitle() + HzFileUtils.getExtension(lawDO.getPdfFileUrl()));
-//            } else {
-//                FileUtil.writeToStream(lawDO.getDocFileUrl(), outputStream);
-//                return HzFileResponse.file(outputStream, lawDO.getTitle() + HzFileUtils.getExtension(lawDO.getDocFileUrl()));
-//            }
-//        }
-//        return null;
-//    }
 
     @Override
     public QueryLawResponseDTO queryLaw(QueryLawRequestDTO requestDTO) {
@@ -388,10 +380,46 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
     }
 
     @Override
-    public String lawStatisticsV2(LawStatisticsRequestDTO requestDTO) {
+    public LawStatisticsResponseDTO lawStatisticsV2(LawStatisticsRequestDTO requestDTO) {
         Map<String, Long> map = lawStatistics(requestDTO);
-        String result = map.entrySet().stream().map(entry -> entry.getKey() + entry.getValue() + "部").collect(Collectors.joining("，"));
-        return StrUtil.format("好的，截至{}，共收录{}", DateUtil.format(DateUtil.date(), "yyyy年MM月"), result);
+        LawStatisticsResponseDTO responseDTO = new LawStatisticsResponseDTO();
+        if (HzCollectionUtils.isNotEmpty(map)) {
+            String result = map.entrySet().stream().map(entry -> entry.getKey() + entry.getValue() + "部").collect(Collectors.joining("，"));
+            responseDTO.setHasData(true);
+            responseDTO.setContent(StrUtil.format("共收录{}", result));
+        } else {
+            responseDTO.setHasData(false);
+            responseDTO.setContent(StrUtil.format("{}暂无{}法规的相关信息。", StrUtil.emptyIfNull(requestDTO.getCity()),
+                    CollUtil.emptyIfNull(requestDTO.getStatus()).stream().map(EnumLawStatus::getDesc).collect(Collectors.joining("、"))));
+        }
+        return responseDTO;
+    }
+
+    @Override
+    public void initPreviewUrl() {
+        com.spire.license.LicenseProvider.setLicenseKey(SpireConfig.KEY);
+        List<LawDO> lawList = mapper.query().select.id().outerId().title().docFileUrl().end()
+                .where.dataSource().notIn(HzCollectionUtils.newArrayList(EnumLawSource.MEASURES_FOR_THE_ESTABLISHMENT_OF_LOCAL_REGULATIONS_IN_HANGZHOU,
+                        EnumLawSource.HANGZHOU_MUNICIPAL_PEOPLE_GOVERNMENT_PORTAL_WEBSITE_LOCAL_REGULATIONS))
+                .previewUrl().isNull().end().to().listEntity();
+        for (LawDO law : lawList) {
+//            threadPoolExecutor.submit(() -> {
+            try {
+                String docFileUrl = law.getDocFileUrl();
+                FileFormat fileFormat = docFileUrl.endsWith(".docx") ? FileFormat.Docx : docFileUrl.endsWith(".doc") ? FileFormat.Doc : FileFormat.Html;
+                Document document = new Document(new ByteArrayInputStream(HttpUtil.downloadBytes("http://192.168.1.13:8080" + docFileUrl)), fileFormat, XHTMLValidationType.None);
+                String fileName = StrUtil.format("/fstore/preview/《{}》（{}）.pdf", law.getTitle(), law.getId());
+                document.saveToFile(fileName.replaceAll("/fstore", "/Users/boboo").replaceAll("preview", "preview2"), FileFormat.PDF);
+                LawContentUpdate update = lawContentMapperWrapper.updater().where.outerId().eq(law.getOuterId()).end().set.previewUrl().is(fileName).end();
+                lawContentMapperWrapper.updateByUpdater(update);
+                LawUpdate lawUpdate = mapper.updater().where.id().eq(law.getId()).end().set.previewUrl().is(fileName).end();
+                mapper.updateByUpdater(lawUpdate);
+                log.info("保存预览文件到：{}", fileName);
+            } catch (Exception e) {
+                log.error("{}异常：{}", law.getTitle(), ExceptionUtil.stacktraceToString(e, 5000));
+            }
+//            });
+        }
     }
 
     private LawInfoElasticSearchRequestDTO buildElasticSearchRequestDTO(LawInfoSearchRequestDTO requestDTO) {
@@ -543,12 +571,11 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
                     jsonObject.set("query", text);
                     titleShould.set("title", jsonObject);
                     lawInfoElasticSearchRequestDTO.should(titleShould);
-
-                    LawInfoElasticSearchRequestDTO.Should contentShould = new LawInfoElasticSearchRequestDTO.Should("match_phrase");
-                    JSONObject json = new JSONObject();
-                    json.set("query", text);
-                    contentShould.set("content", json);
-                    lawInfoElasticSearchRequestDTO.should(contentShould);
+//                    LawInfoElasticSearchRequestDTO.Should contentShould = new LawInfoElasticSearchRequestDTO.Should("match_phrase");
+//                    JSONObject json = new JSONObject();
+//                    json.set("query", text);
+//                    contentShould.set("content", json);
+//                    lawInfoElasticSearchRequestDTO.should(contentShould);
                 }
             }
             requestDTO.setSize(list.size() * 2L);
@@ -596,6 +623,7 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
         }
         responseDTO.setDocFileUrl(lawInfo.getDocFileUrl());
         responseDTO.setPdfFileUrl(lawInfo.getPdfFileUrl());
+        responseDTO.setPreviewUrl(lawInfo.getPreviewUrl());
         responseDTO.setSubject(lawInfo.getSubject());
         return responseDTO;
     }

@@ -1,0 +1,68 @@
+fastgpt:
+  api-url: "http://192.168.1.12:3000"
+  chat-key: "fastgpt-zY84X5ZkmkCQixTCqzXaRWfW1hFrYVJYBpiEIP4BkV7jAfOQsxykT55ezRQj5d"
+  key: "fastgpt-lx7FYjeZ1TX5abbpmLQoVHNoyhWeZ3OSNhHQdbJsPaJw9lhPh9cJSzeUzJBN6pqrb"
+  version: "v1"
+  dataset:
+    deputy: "66ce82434323b89ec93a80b9"
+    proposal: "66ce825f4323b89ec93a8113"
+    activity: "66ce82744323b89ec93a8183"
+    opinion_collection: "66ce82844323b89ec93a81bc"
+    news: "66ce82924323b89ec93a81f7"
+    people_opinion: "66d9103107e26e20684309b7"
+    meeting: ""
+    livelihood_work: "66d9106b07e26e2068430a22"
+    supervise: ""
+    legislation: ""
+
+server:
+  port: 8080
+spring:
+  application:
+    name: SpringbootFastGPTApplication
+  main:
+    allow-bean-definition-overriding: true
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 2GB
+      max-request-size: 2GB
+  datasource:
+    url: jdbc:mysql://192.168.1.13:3306/law?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&useSSL=false&serverTimezone=GMT%2B8
+    username: root
+    password: oneapimmysql
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  redis:
+    host: 192.168.1.133
+    port: 6379
+    database: 15
+    password: Hztech@1.133
+  elasticsearch:
+    bboss:
+      elasticUser:
+      elasticPassword:
+      elasticsearch:
+        rest:
+          hostNames: 192.168.1.13:9200
+        dateFormat: yyyy.MM.dd
+        timeZone: Asia/Shanghai
+        showTemplate: true
+        discoverHost: false
+      dslfile:
+        refreshInterval: -1
+      http:
+        timeoutConnection: 5000
+        timeoutSocket: 5000
+        connectionRequestTimeout: 5000
+        retryTime: 1
+        maxLineLength: -1
+        maxHeaderCount: 200
+        maxTotal: 400
+        defaultMaxPerRoute: 200
+        soReuseAddress: false
+        soKeepAlive: false
+        timeToLive: 3600000
+        keepAlive: 3600000
+        keystore:
+        keyPassword:
+        hostnameVerifier:

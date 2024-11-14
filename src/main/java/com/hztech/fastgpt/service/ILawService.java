@@ -23,7 +23,7 @@ public interface ILawService extends IHzTransactionScriptService<LawDO, Long> {
      */
     HzPage<LawPageResponseDTO> lawPage(LawPageRequestDTO requestDTO);
 
-    HzPage<TempLawPageResponseDTO> tempLawPage(LawPageRequestDTO requestDTO);
+//    HzPage<TempLawPageResponseDTO> tempLawPage(LawPageRequestDTO requestDTO);
 
     boolean save(LawDO lawDO);
 
@@ -56,5 +56,7 @@ public interface ILawService extends IHzTransactionScriptService<LawDO, Long> {
 
     LawPageResponseDTO getLawInfo(String outerId);
 
-    String lawStatisticsV2(LawStatisticsRequestDTO requestDTO);
+    LawStatisticsResponseDTO lawStatisticsV2(LawStatisticsRequestDTO requestDTO);
+
+    void initPreviewUrl();
 }
