@@ -1,8 +1,5 @@
 package com.hztech.fastgpt.util;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DatePattern;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
@@ -13,16 +10,11 @@ import cn.hutool.http.*;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.hztech.fastgpt.dao.po.ArticleSmartDO;
-import com.hztech.fastgpt.dao.po.LawContentBakDO;
 import com.hztech.fastgpt.dao.po.LawContentDO;
 import com.hztech.fastgpt.dao.po.LawDO;
-import com.hztech.fastgpt.dao.wrapper.LawContentBakQuery;
-import com.hztech.fastgpt.dao.wrapper.LawContentQuery;
 import com.hztech.fastgpt.dao.wrapper.LawQuery;
 import com.hztech.fastgpt.mapper.wrapper.ArticleSmartMapperWrapper;
-import com.hztech.fastgpt.mapper.wrapper.LawContentBakMapperWrapper;
 import com.hztech.fastgpt.mapper.wrapper.LawContentMapperWrapper;
-import com.hztech.fastgpt.mapper.wrapper.LawMapperWrapper;
 import com.hztech.fastgpt.model.dto.response.CountryLawBasicDataResponseDTO;
 import com.hztech.fastgpt.model.dto.response.CountryLawDetailDataResponseDTO;
 import com.hztech.fastgpt.model.dto.response.LawDetailResponseDTO;
@@ -31,7 +23,6 @@ import com.hztech.fastgpt.model.enums.EnumLawContentType;
 import com.hztech.fastgpt.model.enums.EnumLawSource;
 import com.hztech.fastgpt.model.enums.EnumLawStatus;
 import com.hztech.fastgpt.model.enums.EnumLawType;
-import com.hztech.fastgpt.service.ILawContentService;
 import com.hztech.fastgpt.service.ILawService;
 import com.hztech.util.*;
 import com.spire.doc.Document;
@@ -1111,101 +1102,101 @@ public class LawDataUtils {
         }
     }
 
-    @SneakyThrows
-    public static void main(String[] args) {
-//        String string = FileUtil.readUtf8String(FileUtil.touch("D:\\fstore\\aaa.ofd"));
-//        System.out.println(string);
-//        Document document = new Document(Files.newInputStream(FileUtil.touch("D:\\fstore\\aaa.ofd").toPath()), FileFormat.Auto);
-//        document.saveToFile("D:\\fstore\\bbb.docx", FileFormat.Docx);
-
-//        XWPFDocument docx = new XWPFDocument(FileUtil.getInputStream("C:\\Users\\PC_Admin\\Downloads\\c7e15807753448a58309da8ec127cebc.docx"));
-//        for (XWPFHeader header : docx.getHeaderList()) {
-//            header.clearHeaderFooter();
-//        }
-//        for (XWPFFooter footer : docx.getFooterList()) {
-//            footer.clearHeaderFooter();
-//        }
-//        for (XWPFParagraph paragraph : docx.getParagraphs()) {
+//    @SneakyThrows
+//    public static void main(String[] args) {
+////        String string = FileUtil.readUtf8String(FileUtil.touch("D:\\fstore\\aaa.ofd"));
+////        System.out.println(string);
+////        Document document = new Document(Files.newInputStream(FileUtil.touch("D:\\fstore\\aaa.ofd").toPath()), FileFormat.Auto);
+////        document.saveToFile("D:\\fstore\\bbb.docx", FileFormat.Docx);
 //
+////        XWPFDocument docx = new XWPFDocument(FileUtil.getInputStream("C:\\Users\\PC_Admin\\Downloads\\c7e15807753448a58309da8ec127cebc.docx"));
+////        for (XWPFHeader header : docx.getHeaderList()) {
+////            header.clearHeaderFooter();
+////        }
+////        for (XWPFFooter footer : docx.getFooterList()) {
+////            footer.clearHeaderFooter();
+////        }
+////        for (XWPFParagraph paragraph : docx.getParagraphs()) {
+////
+////        }
+////        XWPFWordExtractor extractor = new XWPFWordExtractor(docx);
+////        String text = extractor.getText();
+////        System.out.println(text);
+//
+////        System.out.println(HzIdUtils.nextSnowflakeId());
+////        System.out.println(HzIdUtils.nextSnowflakeIdYit());
+////        Document document = new Document("C:\\Users\\PC_Admin\\Downloads\\80e776e3302a4b9a89d06423bd9059fd.docx" , FileFormat.Docx);
+////        List<LawDetailResponseDTO> list = readFromDocxWithArticlePattern(document);
+////        String now = DateUtil.now();
+////        for (LawDetailResponseDTO responseDTO : list) {
+////            StringBuilder stringBuilder = new StringBuilder("INSERT INTO law_content VALUES(");
+////            stringBuilder.append(HzIdUtils.nextSnowflakeIdYit())
+////                    .append(",")
+////                    .append("'ZmY4MDgxODE5MDE0ZWMzZjAxOTA1ZGE0OTY4ZDUyYmY%3D',")
+////                    .append(5).append(",").append(1).append(",")
+////                    .append("'杭州老字号传承与发展条例',")
+////                    .append("'杭州市人民代表大会常务委员会',").append("'2024-07-01 00:00:00',").append("'2024-06-04 00:00:00',")
+////                    .append(ObjectUtil.toString(responseDTO.getPart())).append(",").append(ObjectUtil.toString(responseDTO.getChapter())).append(",")
+////                    .append(ObjectUtil.toString(responseDTO.getSection())).append(",").append(ObjectUtil.toString(responseDTO.getArticle())).append(",")
+////                    .append(responseDTO.getContentType().getValue()).append(",'").append(responseDTO.getContent()).append("',")
+////                    .append(0).append(",").append("'/fstore/80e776e3302a4b9a89d06423bd9059fd.docx',").append("null,'").append(now).append("',").append("'").append(now).append("');");
+////            System.out.println(stringBuilder);
+////        }
+////        System.out.println(JSONUtil.toJsonStr(list));
+//
+//        String json = FileUtil.readUtf8String("D:\\project\\fastgpt\\src\\main\\java\\com\\hztech\\fastgpt\\a.json");
+//        List<String> ids = JSONUtil.parseArray(json).stream().map(item -> JSONUtil.parseObj(item).getStr("id")).collect(Collectors.toList());
+//        String join = "(\"" + CollUtil.join(ids, "\",\"") + "\")";
+//        System.out.println(join);
+//    }
+
+//    public static void rebuildLawContent() {
+//        LawMapperWrapper lawMapperWrapper = HzSpringUtils.getBean(LawMapperWrapper.class);
+//        List<LawDO> all = lawMapperWrapper.findAll();
+//        LawContentBakMapperWrapper lawContentBakMapperWrapper = HzSpringUtils.getBean(LawContentBakMapperWrapper.class);
+//        LawContentBakQuery lawContentBakQuery = lawContentBakMapperWrapper.query().select.outerId().end().groupBy.outerId().end();
+//        List<String> outerIds = lawContentBakMapperWrapper.findFieldListByQuery(lawContentBakQuery);
+//        for (LawDO law : all) {
+//            if (outerIds.contains(law.getOuterId())) {
+//                continue;
+//            }
+//            if (law.getDataSource() == EnumLawSource.NATIONAL_LAWS_AND_REGULATIONS_DATABASE) {
+//                // 重新构建内容
+//                String docFileUrl = law.getDocFileUrl();
+//                FileFormat fileFormat = docFileUrl.endsWith(".docx") ? FileFormat.Docx : docFileUrl.endsWith(".doc") ? FileFormat.Auto : FileFormat.Html;
+//                log.info("url:{}", docFileUrl);
+//                ByteArrayInputStream inputStream = new ByteArrayInputStream(HttpUtil.downloadBytes("http://192.168.1.13:8080" + docFileUrl));
+//                Document document = new Document(inputStream, fileFormat);
+//                List<LawDetailResponseDTO> list = readFromDocx(document);
+//                List<LawContentBakDO> lawContentDOList = list.stream().map(responseDTO -> {
+//                    LawContentBakDO contentDO = new LawContentBakDO();
+//                    contentDO.setOuterId(law.getOuterId());
+//                    contentDO.setType(law.getType());
+//                    contentDO.setStatus(law.getStatus());
+//                    contentDO.setTitle(law.getTitle());
+//                    contentDO.setSubject(law.getSubject());
+//                    contentDO.setEffective(law.getEffective());
+//                    contentDO.setPublish(law.getPublish());
+//                    contentDO.setPart(responseDTO.getPart());
+//                    contentDO.setChapter(responseDTO.getChapter());
+//                    contentDO.setSection(responseDTO.getSection());
+//                    contentDO.setArticle(responseDTO.getArticle());
+//                    contentDO.setContentType(responseDTO.getContentType());
+//                    contentDO.setContent(responseDTO.getContent());
+//                    contentDO.setDataSource(law.getDataSource());
+//                    contentDO.setDocFileUrl(law.getDocFileUrl());
+//                    contentDO.setPdfFileUrl(law.getPdfFileUrl());
+//                    return contentDO;
+//                }).collect(Collectors.toList());
+//                lawContentBakMapperWrapper.insertBatch(lawContentDOList);
+//            } else {
+//                LawContentMapperWrapper lawContentMapperWrapper = HzSpringUtils.getBean(LawContentMapperWrapper.class);
+//                LawContentQuery lawContentQuery = lawContentMapperWrapper.query().where.outerId().eq(law.getOuterId()).end();
+//                List<LawContentDO> list = lawContentMapperWrapper.findListByQuery(lawContentQuery);
+//                List<LawContentBakDO> lawContentBakDOS = BeanUtil.copyToList(list, LawContentBakDO.class, CopyOptions.create().setIgnoreProperties("id"));
+//                lawContentBakMapperWrapper.insertBatch(lawContentBakDOS);
+//            }
 //        }
-//        XWPFWordExtractor extractor = new XWPFWordExtractor(docx);
-//        String text = extractor.getText();
-//        System.out.println(text);
-
-//        System.out.println(HzIdUtils.nextSnowflakeId());
-//        System.out.println(HzIdUtils.nextSnowflakeIdYit());
-//        Document document = new Document("C:\\Users\\PC_Admin\\Downloads\\80e776e3302a4b9a89d06423bd9059fd.docx" , FileFormat.Docx);
-//        List<LawDetailResponseDTO> list = readFromDocxWithArticlePattern(document);
-//        String now = DateUtil.now();
-//        for (LawDetailResponseDTO responseDTO : list) {
-//            StringBuilder stringBuilder = new StringBuilder("INSERT INTO law_content VALUES(");
-//            stringBuilder.append(HzIdUtils.nextSnowflakeIdYit())
-//                    .append(",")
-//                    .append("'ZmY4MDgxODE5MDE0ZWMzZjAxOTA1ZGE0OTY4ZDUyYmY%3D',")
-//                    .append(5).append(",").append(1).append(",")
-//                    .append("'杭州老字号传承与发展条例',")
-//                    .append("'杭州市人民代表大会常务委员会',").append("'2024-07-01 00:00:00',").append("'2024-06-04 00:00:00',")
-//                    .append(ObjectUtil.toString(responseDTO.getPart())).append(",").append(ObjectUtil.toString(responseDTO.getChapter())).append(",")
-//                    .append(ObjectUtil.toString(responseDTO.getSection())).append(",").append(ObjectUtil.toString(responseDTO.getArticle())).append(",")
-//                    .append(responseDTO.getContentType().getValue()).append(",'").append(responseDTO.getContent()).append("',")
-//                    .append(0).append(",").append("'/fstore/80e776e3302a4b9a89d06423bd9059fd.docx',").append("null,'").append(now).append("',").append("'").append(now).append("');");
-//            System.out.println(stringBuilder);
-//        }
-//        System.out.println(JSONUtil.toJsonStr(list));
-
-        String json = FileUtil.readUtf8String("D:\\project\\fastgpt\\src\\main\\java\\com\\hztech\\fastgpt\\a.json");
-        List<String> ids = JSONUtil.parseArray(json).stream().map(item -> JSONUtil.parseObj(item).getStr("id")).collect(Collectors.toList());
-        String join = "(\"" + CollUtil.join(ids, "\",\"") + "\")";
-        System.out.println(join);
-    }
-
-    public static void rebuildLawContent() {
-        LawMapperWrapper lawMapperWrapper = HzSpringUtils.getBean(LawMapperWrapper.class);
-        List<LawDO> all = lawMapperWrapper.findAll();
-        LawContentBakMapperWrapper lawContentBakMapperWrapper = HzSpringUtils.getBean(LawContentBakMapperWrapper.class);
-        LawContentBakQuery lawContentBakQuery = lawContentBakMapperWrapper.query().select.outerId().end().groupBy.outerId().end();
-        List<String> outerIds = lawContentBakMapperWrapper.findFieldListByQuery(lawContentBakQuery);
-        for (LawDO law : all) {
-            if (outerIds.contains(law.getOuterId())) {
-                continue;
-            }
-            if (law.getDataSource() == EnumLawSource.NATIONAL_LAWS_AND_REGULATIONS_DATABASE) {
-                // 重新构建内容
-                String docFileUrl = law.getDocFileUrl();
-                FileFormat fileFormat = docFileUrl.endsWith(".docx") ? FileFormat.Docx : docFileUrl.endsWith(".doc") ? FileFormat.Auto : FileFormat.Html;
-                log.info("url:{}", docFileUrl);
-                ByteArrayInputStream inputStream = new ByteArrayInputStream(HttpUtil.downloadBytes("http://192.168.1.13:8080" + docFileUrl));
-                Document document = new Document(inputStream, fileFormat);
-                List<LawDetailResponseDTO> list = readFromDocx(document);
-                List<LawContentBakDO> lawContentDOList = list.stream().map(responseDTO -> {
-                    LawContentBakDO contentDO = new LawContentBakDO();
-                    contentDO.setOuterId(law.getOuterId());
-                    contentDO.setType(law.getType());
-                    contentDO.setStatus(law.getStatus());
-                    contentDO.setTitle(law.getTitle());
-                    contentDO.setSubject(law.getSubject());
-                    contentDO.setEffective(law.getEffective());
-                    contentDO.setPublish(law.getPublish());
-                    contentDO.setPart(responseDTO.getPart());
-                    contentDO.setChapter(responseDTO.getChapter());
-                    contentDO.setSection(responseDTO.getSection());
-                    contentDO.setArticle(responseDTO.getArticle());
-                    contentDO.setContentType(responseDTO.getContentType());
-                    contentDO.setContent(responseDTO.getContent());
-                    contentDO.setDataSource(law.getDataSource());
-                    contentDO.setDocFileUrl(law.getDocFileUrl());
-                    contentDO.setPdfFileUrl(law.getPdfFileUrl());
-                    return contentDO;
-                }).collect(Collectors.toList());
-                lawContentBakMapperWrapper.insertBatch(lawContentDOList);
-            } else {
-                LawContentMapperWrapper lawContentMapperWrapper = HzSpringUtils.getBean(LawContentMapperWrapper.class);
-                LawContentQuery lawContentQuery = lawContentMapperWrapper.query().where.outerId().eq(law.getOuterId()).end();
-                List<LawContentDO> list = lawContentMapperWrapper.findListByQuery(lawContentQuery);
-                List<LawContentBakDO> lawContentBakDOS = BeanUtil.copyToList(list, LawContentBakDO.class, CopyOptions.create().setIgnoreProperties("id"));
-                lawContentBakMapperWrapper.insertBatch(lawContentBakDOS);
-            }
-        }
-    }
+//    }
 
 }

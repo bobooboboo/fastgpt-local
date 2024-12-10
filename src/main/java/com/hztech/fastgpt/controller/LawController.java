@@ -45,6 +45,11 @@ public class LawController {
 
     private final IHigherLevelLawService higherLevelLawService;
 
+//    @PostMapping("/api/v1/updateLaw")
+//    public ResponseEntity<StreamingResponseBody> updateLaw(@RequestBody LawInfo lawInfo) {
+//        return lawService.updateLaw();
+//    }
+
     @Async
     @ApiIgnore
     @ApiOperation("获取远程立法数据到DB")
@@ -166,11 +171,12 @@ public class LawController {
         return HzResponse.success(lawService.getModifiedContent(requestDTO));
     }
 
-    @GetMapping("/api/v1/rebuildLawContent")
-    public HzResponse<Void> rebuildLawContent() {
-        LawDataUtils.rebuildLawContent();
-        return HzResponse.success();
-    }
+//    @ApiOperation("重新构建法规内容")
+//    @GetMapping("/api/v1/rebuildLawContent")
+//    public HzResponse<Void> rebuildLawContent() {
+//        LawDataUtils.rebuildLawContent();
+//        return HzResponse.success();
+//    }
 
 //    @GetMapping("/api/v1/initPreviewUrl")
 //    public HzResponse<Void> initPreviewUrl() {

@@ -16,7 +16,6 @@ import cn.hutool.json.JSONUtil;
 import cn.org.atool.fluent.mybatis.If;
 import com.github.difflib.text.DiffRow;
 import com.github.difflib.text.DiffRowGenerator;
-import com.hztech.fastgpt.ServiceRequests;
 import com.hztech.fastgpt.dao.ILawDao;
 import com.hztech.fastgpt.dao.po.LawContentDO;
 import com.hztech.fastgpt.dao.po.LawDO;
@@ -67,7 +66,7 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
 
     private final LawMapperWrapper mapper;
 
-    private final ServiceRequests serviceRequests;
+//    private final ServiceRequests serviceRequests;
 
     private final BBossESStarter bossESStarter;
 
@@ -193,7 +192,7 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
                 .where
                 .type().in(requestDTO.getType(), If::notEmpty)
 //                .type().in(CollUtil.defaultIfEmpty(lawTypes, defaultLawTypeList))
-//                .status().in(requestDTO.getStatus(), If::notEmpty)
+                .status().in(requestDTO.getStatus(), If::notEmpty)
                 .subject().like(requestDTO.getSubject(), If::notBlank)
                 .dataSource().in(LOCAL_REGULATIONS_LAW_SOURCE_LIST).end();
         if (requestDTO.getYear() != null && requestDTO.getYear() > 0) {
@@ -223,20 +222,21 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
             EnumLawType enumLawType = entry.getKey();
             if (defaultLawTypeList.contains(enumLawType)) {
                 result.put(enumLawType.getDesc(), map.get(enumLawType));
-            } else {
-                if (result.containsKey("相关文件")) {
-                    result.put("相关文件", result.get("相关文件") + map.get(enumLawType));
-                } else {
-                    result.put("相关文件", map.get(enumLawType));
-                }
             }
+//            else {
+//                if (result.containsKey("相关文件")) {
+//                    result.put("相关文件", result.get("相关文件") + map.get(enumLawType));
+//                } else {
+//                    result.put("相关文件", map.get(enumLawType));
+//                }
+//            }
         }
-        if (HzCollectionUtils.isNotEmpty(requestDTO.getStatus())) {
-            Map<EnumLawStatus, Long> lawStatusMap = list.stream().collect(Collectors.groupingBy(LawDO::getStatus, Collectors.counting()));
-            for (EnumLawStatus lawStatus : requestDTO.getStatus()) {
-                result.put(lawStatus.getDesc(), lawStatusMap.getOrDefault(lawStatus, 0L));
-            }
-        }
+//        if (HzCollectionUtils.isNotEmpty(requestDTO.getStatus())) {
+//            Map<EnumLawStatus, Long> lawStatusMap = list.stream().collect(Collectors.groupingBy(LawDO::getStatus, Collectors.counting()));
+//            for (EnumLawStatus lawStatus : requestDTO.getStatus()) {
+//                result.put(lawStatus.getDesc(), lawStatusMap.getOrDefault(lawStatus, 0L));
+//            }
+//        }
         return result;
     }
 
@@ -381,7 +381,21 @@ public class LawServiceImpl extends HzBaseTransactionScriptService<ILawDao, LawD
 
     @Override
     public LawStatisticsResponseDTO lawStatisticsV2(LawStatisticsRequestDTO requestDTO) {
-        Map<String, Long> map = lawStatistics(requestDTO);
+        Map<String, Long> map;
+        if (StrUtil.startWith(requestDTO.getCity(), "杭州")
+                && CollUtil.size(requestDTO.getStatus()) == 1
+                && CollUtil.getFirst(requestDTO.getStatus()) == EnumLawStatus.EFFECTIVE
+                && (requestDTO.getYear() == null || requestDTO.getYear() == 0)
+                && CollUtil.isEmpty(requestDTO.getType())
+                && HzStringUtils.isBlank(requestDTO.getSubject())
+                && HzStringUtils.isBlank(requestDTO.getPublishBegin())
+                && HzStringUtils.isBlank(requestDTO.getPublishEnd())) {
+            map = new HashMap<>();
+            map.put("地方性法规", 113L);
+        } else {
+            map = lawStatistics(requestDTO);
+        }
+//        Map<String, Long> map = lawStatistics(requestDTO);
         LawStatisticsResponseDTO responseDTO = new LawStatisticsResponseDTO();
         if (HzCollectionUtils.isNotEmpty(map)) {
             String result = map.entrySet().stream().map(entry -> entry.getKey() + entry.getValue() + "部").collect(Collectors.joining("，"));

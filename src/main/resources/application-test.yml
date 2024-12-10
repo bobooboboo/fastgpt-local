@@ -14,6 +14,7 @@ fastgpt:
     livelihood_work: "66d9106b07e26e2068430a22"
     supervise: ""
     legislation: ""
+    suggestion: "672cb3e950649488fcc5e2f9"
 
 server:
   port: 8080
@@ -33,7 +34,7 @@ spring:
     password: oneapimmysql
     driver-class-name: com.mysql.cj.jdbc.Driver
   redis:
-    host: 192.168.1.133
+    host: 127.0.0.1
     port: 6379
     database: 15
     password: Hztech@1.133

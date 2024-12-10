@@ -52,7 +52,12 @@ public enum EnumBusinessType implements IIntegerEnum {
     /**
      * 立法工作
      */
-    LEGISLATION(10, "立法工作");
+    LEGISLATION(10, "立法工作"),
+
+    /**
+     * 意见建议
+     */
+    SUGGESTION(11, "意见建议");
 
     /**
      * 值
